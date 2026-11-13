@@ -761,7 +761,11 @@ case $MODE in status|remote|local|full|feature|cleanup|prs|whats-new) ;; -h|--he
 PATTERN=""
 if [ "$MODE" = feature ]; then
   PATTERN=${1:-}
-  case $PATTERN in ""|-*) die "feature needs a branch name or pattern, e.g.: feature 'feat/login*'" ;; esac
+  case $PATTERN in
+    ""|-*) # exit 0 on purpose: a skill that injects this output must still load and ask the user
+      echo "git-parity feature: a branch name or pattern is needed, for example: feature login   or   feature 'feat/login*'"
+      exit 0 ;;
+  esac
   shift
 fi
 

@@ -271,7 +271,8 @@ has "feature/next" "$out" "publish feat/pay-ui: git -C"
 eq  "feature/merge order" "$(printf '%s\n' "$out" | grep '^| f-api' | head -1 | cut -d'|' -f3 | tr -d ' ')" "feat/pay-core"
 eq  "feature/read-only" "$(snapshot "$F1")" "$before"
 out=$(bash "$GP" feature 'feat/pay-u*' --no-fetch "$F1"); has "feature/glob" "$out" "1 branch(es)"
-out=$(bash "$GP" feature 2>&1); eq "feature/needs pattern" "$?" "2"
+out=$(bash "$GP" feature 2>&1); eq "feature/no pattern still exits 0" "$?" "0"
+has "feature/no pattern asks for one" "$out" "a branch name or pattern is needed"
 
 # 21. cleanup lists, never deletes
 C1=$(new c-one)
