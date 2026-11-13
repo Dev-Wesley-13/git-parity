@@ -1,0 +1,118 @@
+# git-parity
+
+**Mantenha branches locais e remotas em paridade em todos os seus repositórios, com um comando do Claude Code.**
+
+O `git-parity` verifica cada repositório em que você trabalha, faz fast-forward do
+que é seguro, oferece enviar o que só existe na sua máquina e entrega um relatório
+curto com o próximo passo exato para tudo o que ele deixou como estava.
+
+[English](README.md)
+
+```
+git-parity full · 4 repo(s) · 2 need attention · fetched in 1s
+
+| Repo | Branch     | State       | Detail                    |
+|------|------------|-------------|---------------------------|
+| app  | main       | DIRTY 1     | uncommitted changes       |
+| web  | feat/login | NO-UPSTREAM | never pushed, 1 commit(s) |
+| api  | feat/pay   | OK          | main updated +1           |
+
+Clean (1): docs
+
+Push candidates (ask before each push)
+- web · feat/login · never pushed, 1 commit(s) · git -C ~/web push -u origin feat/login
+
+Next steps
+- app: commit or stash 1 file(s): git -C ~/app status --short
+- web: publish the branch: git -C ~/web push -u origin feat/login
+```
+
+O script imprime em inglês; o Claude apresenta o relatório no seu idioma.
+
+## Por quê
+
+- **Seguro por construção.** Só fast-forward. Nunca faz pull por cima de mudanças
+  não commitadas e nunca força, reseta, faz stash, rebase, troca ou apaga branch.
+- **Nada sai da sua máquina sem um sim.** Push e pull request são oferecidos um
+  repositório por vez.
+- **Atualiza a branch base sem sair da sua feature branch.** A `main` fica em dia
+  enquanto você continua onde está.
+- **Rápido e barato.** Um script bash faz fetch de todos os repositórios em
+  paralelo e imprime o relatório pronto. O modelo lê um resultado em vez de rodar
+  quinze comandos git.
+- **Sem dependências.** bash e git. `gh` é opcional, para pull requests.
+
+## Instalação
+
+No Claude Code:
+
+```
+/plugin marketplace add Dev-Wesley-13/git-parity
+/plugin install git-parity@git-parity
+```
+
+Atualize com `/plugin update git-parity@git-parity`. Remova com
+`/plugin uninstall git-parity@git-parity`.
+
+Requisitos: git 2.23+, bash 3.2+ (Linux, macOS, WSL, Git Bash).
+
+## Comandos
+
+| Comando | O que faz | Altera |
+|---|---|---|
+| `/git-parity:status` | Só relatório. | Nada (roda `git fetch`). |
+| `/git-parity:remote` | Traz o remoto: fast-forward de toda branch que está só atrás. | Branches locais, só fast-forward. |
+| `/git-parity:local` | Acha trabalho que só existe na sua máquina e oferece push e pull request. | Remoto, após você confirmar cada um. |
+| `/git-parity:full` | `remote`, depois `local`. | Ambos, mesmas regras. |
+
+Todo comando aceita caminhos: `/git-parity:status ~/code/api ~/code/web`.
+
+## Quais repositórios
+
+Vale a primeira fonte que retornar algo:
+
+1. Caminhos passados ao comando.
+2. `~/.config/git-parity/repos`, um caminho por linha (`#` inicia comentário, `~` é expandido).
+3. O repositório em que você está.
+4. Repositórios até dois níveis abaixo do diretório atual.
+
+## Branches protegidas
+
+A branch base (`origin/HEAD`, senão `main`, senão `master`) nunca é oferecida para
+push. Adicione outros nomes, um por linha, em `~/.config/git-parity/never-push`.
+
+## Lendo o relatório
+
+As linhas vêm ordenadas por urgência. Repositórios sem nada a dizer ficam na linha
+`Clean`.
+
+| Estado | Significado | O que o git-parity faz |
+|---|---|---|
+| `DIVERGED` | Local e remoto têm commits novos. | Nada. Explica os dois lados. |
+| `IN-PROGRESS` | Rebase, merge ou cherry-pick inacabado. | Nada. |
+| `STALE` | Fetch falhou; os dados podem estar velhos. | Reporta com o que tem. |
+| `DIRTY n` | `n` arquivos não commitados. | Nada. Nunca faz pull por cima. |
+| `AHEAD n` | `n` commits não enviados. | Oferece push em `local`/`full`. |
+| `BEHIND n` | O remoto tem `n` commits novos. | Fast-forward em `remote`/`full`. |
+| `DETACHED` | Nenhuma branch em uso. | Nada. |
+| `NO-UPSTREAM` | Branch nunca enviada. | Oferece push em `local`/`full`. |
+| `GONE` | Branch remota apagada, em geral após merge. | Nada. |
+| `BRANCHES` | Branch atual em ordem; outra branch pede atenção. | Veja Detail. |
+| `OK` | Limpo, com algo que vale saber (ex.: `main updated +3`). | Feito. |
+
+## Documentação
+
+Em inglês: [Guia](docs/guide.md), [Como funciona](docs/how-it-works.md),
+[Segurança](docs/safety.md).
+
+## Desenvolvimento
+
+```bash
+bash tests/run.sh
+```
+
+Para testar o plugin a partir do checkout: `claude --plugin-dir .`
+
+## Licença
+
+[MIT](LICENSE)

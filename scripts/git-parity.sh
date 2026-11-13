@@ -1,0 +1,360 @@
+#!/usr/bin/env bash
+# git-parity: report (and safely fast-forward) the state of many git repositories.
+#
+# Usage: git-parity.sh <status|remote|local|full> [--no-fetch] [repo-path ...]
+#
+#   status  read-only report (only runs `git fetch`)
+#   remote  status + fast-forward local branches that are strictly behind
+#   local   status, with push candidates listed under "Push candidates"
+#   full    remote + local
+#
+# Never pushes, forces, resets, stashes, commits, deletes or checks out anything.
+# Bash 3.2 compatible (macOS): no associative arrays, no mapfile.
+
+set -u
+export GIT_TERMINAL_PROMPT=0
+export LC_ALL=C
+
+CONFIG_DIR="${GIT_PARITY_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/git-parity}"
+FETCH_TIMEOUT="${GIT_PARITY_FETCH_TIMEOUT:-30}"
+JOBS="${GIT_PARITY_JOBS:-8}"
+MAX_BRANCH_LINES=8
+SEP=$'\037'   # unit separator: never appears in branch names or paths
+
+die() { echo "git-parity: $*" >&2; exit 2; }
+
+qpath() { # shell-quoted path, with $HOME shown as ~ so commands stay short
+  local q; q=$(printf '%q' "$1")
+  case $q in "$HOME"/*) q="~${q#"$HOME"}" ;; esac
+  printf '%s' "$q"
+}
+
+# --- worker: one repo -> record lines on stdout ------------------------------
+# Record format (fields separated by \037):
+#   R <rank> <name> <branch> <state> <detail>
+#   N <name> <next step text>
+#   P <name> <path> <branch> <ahead> <upstream|->       (push candidate)
+#   C <name>                                             (clean repo)
+#   U <name> <count> <newest names>                      (remote branches not merged into base, no local copy)
+
+run_fetch() {
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$FETCH_TIMEOUT" git -C "$1" fetch --prune --quiet 2>/dev/null
+  else
+    git -C "$1" fetch --prune --quiet 2>/dev/null
+  fi
+}
+
+detect_base() { # prints short base branch name, or nothing
+  local repo=$1 ref
+  ref=$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
+  if [ -n "$ref" ]; then echo "${ref#origin/}"; return; fi
+  for ref in main master; do
+    if git -C "$repo" show-ref --verify --quiet "refs/remotes/origin/$ref"; then echo "$ref"; return; fi
+  done
+}
+
+foreign_upstream() { # branch upstream base -> 0 if the branch tracks the base, not its own remote branch
+  [ -n "$2" ] && [ -n "$3" ] && [ "$1" != "$3" ] && [ "$2" = "origin/$3" ]
+}
+
+unpushed_count() { # repo ref base -> commits on ref that exist on no remote branch
+  git -C "$1" rev-list --count "$2" --not --remotes 2>/dev/null || echo 0
+}
+
+never_push() { # branch base -> 0 if this branch must never be offered for push
+  [ "$1" = "$2" ] && return 0
+  [ -f "$CONFIG_DIR/never-push" ] && grep -qxF -- "$1" "$CONFIG_DIR/never-push" && return 0
+  return 1
+}
+
+worker() {
+  local mode=$1 do_fetch=$2 repo=$3
+  local do_ff=0 want_push=0
+  case $mode in remote|full) do_ff=1 ;; esac
+  case $mode in local|full) want_push=1 ;; esac
+
+  local name; name=$(basename "$repo")
+  local q; q=$(qpath "$repo")
+  if ! git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
+    printf 'R%s1%s%s%s-%sERROR%snot a git repository: %s\n' "$SEP" "$SEP" "$name" "$SEP" "$SEP" "$SEP" "$repo"
+    return
+  fi
+
+  local stale=""
+  if [ "$do_fetch" = 1 ] && [ -n "$(git -C "$repo" remote)" ]; then
+    run_fetch "$repo" || stale=1
+  fi
+
+  local gitdir; gitdir=$(git -C "$repo" rev-parse --absolute-git-dir)
+  local branch; branch=$(git -C "$repo" symbolic-ref --quiet --short HEAD 2>/dev/null)
+  local base; base=$(detect_base "$repo")
+  local dirty; dirty=$(git -C "$repo" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+  local inprog=""
+  if [ -d "$gitdir/rebase-merge" ] || [ -d "$gitdir/rebase-apply" ]; then inprog="rebase"
+  elif [ -f "$gitdir/MERGE_HEAD" ]; then inprog="merge"
+  elif [ -f "$gitdir/CHERRY_PICK_HEAD" ]; then inprog="cherry-pick"
+  fi
+
+  local notes="" updated=""
+  local n_ahead=0 n_div=0 n_gone=0 n_behind=0
+
+  # --- every local branch with an upstream --------------------------------
+  local b up upref track ahead behind
+  while IFS="$SEP" read -r b up upref track; do
+    [ -n "$b" ] || continue
+    [ "$b" = "$branch" ] && continue             # current branch handled below
+    foreign_upstream "$b" "$up" "$base" && up=""
+    if [ -z "$up" ]; then
+      ahead=$(unpushed_count "$repo" "refs/heads/$b" "$base")
+      if [ "$ahead" != 0 ]; then
+        n_ahead=$((n_ahead + 1))
+        notes="$notes; $b never pushed ($ahead commit(s))"
+        if [ "$want_push" = 1 ] && ! never_push "$b" "$base"; then
+          printf 'P%s%s%s%s%s%s%s%s%s-\n' "$SEP" "$name" "$SEP" "$repo" "$SEP" "$b" "$SEP" "$ahead" "$SEP"
+        fi
+      fi
+      continue
+    fi
+    if [ "$track" = "[gone]" ]; then n_gone=$((n_gone + 1)); continue; fi
+    ahead=$(git -C "$repo" rev-list --count "$up..refs/heads/$b" 2>/dev/null || echo 0)
+    behind=$(git -C "$repo" rev-list --count "refs/heads/$b..$up" 2>/dev/null || echo 0)
+
+    if [ "$behind" -gt 0 ] && [ "$ahead" -eq 0 ]; then
+      if [ "$do_ff" = 1 ] && git -C "$repo" fetch --quiet . "$upref:refs/heads/$b" 2>/dev/null; then
+        updated="$updated; $b updated +$behind"
+      else
+        n_behind=$((n_behind + 1))
+        notes="$notes; $b behind $behind"
+      fi
+    elif [ "$ahead" -gt 0 ] && [ "$behind" -gt 0 ]; then
+      n_div=$((n_div + 1))
+      notes="$notes; $b diverged (+$ahead/-$behind)"
+    elif [ "$ahead" -gt 0 ]; then
+      n_ahead=$((n_ahead + 1))
+      notes="$notes; $b ahead $ahead (not pushed)"
+      if [ "$want_push" = 1 ] && ! never_push "$b" "$base"; then
+        printf 'P%s%s%s%s%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$repo" "$SEP" "$b" "$SEP" "$ahead" "$SEP" "$up"
+      fi
+    fi
+  done <<EOF
+$(git -C "$repo" for-each-ref --format="%(refname:short)$SEP%(upstream:short)$SEP%(upstream)$SEP%(upstream:track)" refs/heads 2>/dev/null)
+EOF
+
+  # --- current branch -------------------------------------------------------
+  local state rank detail="" next=""
+  local cur_up="" cur_ahead=0 cur_behind=0 cur_gone="" tracks_base="" base_behind=0 unpushed=0
+  if [ -n "$branch" ]; then
+    cur_up=$(git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name "$branch@{upstream}" 2>/dev/null)
+    if foreign_upstream "$branch" "$cur_up" "$base"; then tracks_base=$cur_up; cur_up=""; fi
+    if [ -n "$base" ] && [ "$branch" != "$base" ]; then
+      base_behind=$(git -C "$repo" rev-list --count "HEAD..refs/remotes/origin/$base" 2>/dev/null || echo 0)
+    fi
+    if [ -n "$cur_up" ]; then
+      if git -C "$repo" rev-parse --verify --quiet "$cur_up" >/dev/null; then
+        cur_ahead=$(git -C "$repo" rev-list --count "$cur_up..HEAD")
+        cur_behind=$(git -C "$repo" rev-list --count "HEAD..$cur_up")
+      else
+        cur_gone=1
+      fi
+    fi
+  fi
+
+  # fast-forward the current branch when it is safe
+  if [ "$do_ff" = 1 ] && [ -n "$branch" ] && [ -z "$inprog" ] && [ "$dirty" = 0 ] \
+     && [ "$cur_behind" -gt 0 ] && [ "$cur_ahead" -eq 0 ]; then
+    if git -C "$repo" merge --ff-only --quiet "$cur_up" >/dev/null 2>&1; then
+      updated="; $branch updated +$cur_behind$updated"
+      cur_behind=0
+    fi
+  fi
+
+  if [ -n "$inprog" ]; then
+    state="IN-PROGRESS"; rank=2; detail="$inprog in progress; skipped"
+    next="finish or abort the $inprog: git -C $q status"
+  elif [ -z "$branch" ]; then
+    state="DETACHED"; rank=6; detail="HEAD detached at $(git -C "$repo" rev-parse --short HEAD 2>/dev/null); skipped"
+    next="check out a branch: git -C $q switch ${base:-<branch>}"
+  elif [ "$cur_ahead" -gt 0 ] && [ "$cur_behind" -gt 0 ]; then
+    state="DIVERGED"; rank=0; detail="$cur_ahead local / $cur_behind remote commits differ; not touched"
+    next="diverged from $cur_up; inspect both sides: git -C $q log --oneline --left-right $branch...$cur_up"
+  elif [ "$dirty" -gt 0 ]; then
+    state="DIRTY $dirty"; rank=4; detail="uncommitted changes"
+    [ "$cur_behind" -gt 0 ] && detail="$detail; behind $cur_behind, not pulled"
+    [ "$cur_ahead" -gt 0 ] && detail="$detail; ahead $cur_ahead"
+    next="commit or stash $dirty file(s): git -C $q status --short"
+  elif [ -n "$cur_gone" ]; then
+    state="GONE"; rank=7; detail="remote branch deleted (likely merged)"
+    next="branch $branch looks finished; switch back: git -C $q switch ${base:-<branch>}"
+  elif [ -z "$cur_up" ]; then
+    unpushed=$(unpushed_count "$repo" HEAD "$base")
+    state="NO-UPSTREAM"; rank=7; detail="never pushed, $unpushed commit(s)"
+    [ -n "$tracks_base" ] && detail="$detail; tracks $tracks_base instead of its own remote branch"
+    if [ "$unpushed" = 0 ]; then
+      state="CLEAN"; rank=9; detail="new branch, no commits yet"
+    elif ! never_push "$branch" "$base"; then
+      next="publish the branch: git -C $q push -u origin $branch"
+      [ "$want_push" = 1 ] && printf 'P%s%s%s%s%s%s%s%s%s-\n' "$SEP" "$name" "$SEP" "$repo" "$SEP" "$branch" "$SEP" "$unpushed" "$SEP"
+    fi
+  elif [ "$cur_ahead" -gt 0 ]; then
+    state="AHEAD $cur_ahead"; rank=5; detail="not pushed"
+    if never_push "$branch" "$base"; then
+      detail="not pushed (protected: open a PR from a feature branch)"
+    else
+      next="push $cur_ahead commit(s): git -C $q push"
+      [ "$want_push" = 1 ] && printf 'P%s%s%s%s%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$repo" "$SEP" "$branch" "$SEP" "$cur_ahead" "$SEP" "$cur_up"
+    fi
+  elif [ "$cur_behind" -gt 0 ]; then
+    state="BEHIND $cur_behind"; rank=6; detail="can fast-forward"
+    next="fast-forward: /git-parity:remote  (or: git -C $q merge --ff-only $cur_up)"
+  else
+    state="CLEAN"; rank=9
+  fi
+
+  [ "$base_behind" -gt 0 ] && detail="$detail; $base_behind behind $base"
+  [ "$n_gone" -gt 0 ] && notes="$notes; $n_gone branch(es) with remote gone (likely merged)"
+  if [ -n "$stale" ]; then
+    notes="; fetch failed, data may be stale$notes"
+    [ "$rank" -gt 3 ] && rank=3
+    [ "$state" = "CLEAN" ] && state="STALE"
+    [ -z "$next" ] && next="fetch failed; check network/credentials: git -C $q fetch"
+  fi
+  if [ -z "$base" ] && [ -n "$(git -C "$repo" remote)" ]; then
+    notes="$notes; base branch unknown (run: git -C $q remote set-head origin -a)"
+  fi
+
+  # other branches needing attention keep a clean repo out of the "Clean" line
+  if [ "$state" = "CLEAN" ] && [ $((n_ahead + n_div + n_behind)) -gt 0 ]; then
+    state="BRANCHES"; rank=8
+  fi
+
+  # remote branches not merged into the base that have no local branch (someone else's work, or yours from another machine)
+  if [ -n "$base" ]; then
+    local remote_only count
+    remote_only=$(git -C "$repo" for-each-ref --no-merged="refs/remotes/origin/$base" --sort=-committerdate \
+        --format='%(refname:lstrip=3)' refs/remotes/origin 2>/dev/null | grep -vx HEAD | while IFS= read -r b; do
+      git -C "$repo" show-ref --verify --quiet "refs/heads/$b" || printf '%s\n' "$b"
+    done)
+    if [ -n "$remote_only" ]; then
+      count=$(printf '%s\n' "$remote_only" | grep -c .)
+      printf 'U%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$count" "$SEP" "$(printf '%s\n' "$remote_only" | head -3 | tr '\n' ',' | sed 's/,$//; s/,/, /g')"
+    fi
+  fi
+
+  detail="$detail$updated$notes"
+  detail="${detail#; }"
+
+  if [ "$state" = "CLEAN" ]; then
+    if [ -n "$detail" ]; then
+      printf 'R%s%s%s%s%s%s%sOK%s%s\n' "$SEP" "$rank" "$SEP" "$name" "$SEP" "${branch:-}" "$SEP" "$SEP" "$detail"
+    else
+      printf 'C%s%s\n' "$SEP" "$name"
+    fi
+  else
+    printf 'R%s%s%s%s%s%s%s%s%s%s\n' "$SEP" "$rank" "$SEP" "$name" "$SEP" "${branch:--}" "$SEP" "$state" "$SEP" "$detail"
+  fi
+  [ -n "$next" ] && printf 'N%s%s%s%s\n' "$SEP" "$name" "$SEP" "$next"
+  return 0
+}
+
+# --- repo discovery -----------------------------------------------------------
+discover() {
+  if [ "$#" -gt 0 ]; then printf '%s\n' "$@"; return; fi
+  if [ -f "$CONFIG_DIR/repos" ]; then
+    local line
+    while IFS= read -r line || [ -n "$line" ]; do
+      line="${line%%#*}"
+      line=$(printf '%s' "$line" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+      [ -n "$line" ] || continue
+      case $line in "~"*) line="$HOME${line#\~}" ;; esac
+      printf '%s\n' "$line"
+    done < "$CONFIG_DIR/repos"
+    return
+  fi
+  local top; top=$(git rev-parse --show-toplevel 2>/dev/null)
+  if [ -n "$top" ]; then printf '%s\n' "$top"; return; fi
+  find . -mindepth 2 -maxdepth 3 -name .git -prune 2>/dev/null | sed 's|/\.git$||; s|^\./||' | sort
+}
+
+# --- report -------------------------------------------------------------------
+render() {
+  local mode=$1 tmp=$2 total=$3 secs=$4
+  local attention; attention=$(grep -c "^R${SEP}[0-8]${SEP}" "$tmp")
+  local fetched="fetched in ${secs}s"; [ "$DO_FETCH" = 1 ] || fetched="no fetch"
+  echo "git-parity $mode · $total repo(s) · $attention need attention · $fetched"
+  echo
+  if grep -q "^R$SEP" "$tmp"; then
+    echo "| Repo | Branch | State | Detail |"
+    echo "|---|---|---|---|"
+    grep "^R$SEP" "$tmp" | sort -t "$SEP" -k2,2n -k3,3 | while IFS="$SEP" read -r _ _ name branch state detail; do
+      echo "| $name | $branch | $state | $(clip_detail "$detail") |"
+    done
+    echo
+  fi
+  local clean; clean=$(grep "^C$SEP" "$tmp" | cut -d "$SEP" -f2 | sort | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+  if [ -n "$clean" ]; then
+    echo "Clean ($(grep -c "^C$SEP" "$tmp")): $clean"
+    echo
+  fi
+  if grep -q "^P$SEP" "$tmp"; then
+    echo "Push candidates (ask before each push)"
+    grep "^P$SEP" "$tmp" | sort -t "$SEP" -k2,2 -k4,4 | while IFS="$SEP" read -r _ name path branch ahead up; do
+      if [ "$up" = "-" ]; then echo "- $name · $branch · never pushed, $ahead commit(s) · git -C $(qpath "$path") push -u origin $branch"
+      else echo "- $name · $branch · $ahead commit(s) ahead of $up · git -C $(qpath "$path") push origin $branch"
+      fi
+    done
+    echo
+  fi
+  if grep -q "^U$SEP" "$tmp"; then
+    echo "Remote branches not merged into base (no local copy)"
+    grep "^U$SEP" "$tmp" | sort -t "$SEP" -k2,2 | while IFS="$SEP" read -r _ name count names; do
+      if [ "$count" -gt 3 ]; then echo "- $name: $count, newest: $names"; else echo "- $name: $names"; fi
+    done
+    echo
+  fi
+  if grep -q "^N$SEP" "$tmp"; then
+    echo "Next steps"
+    # order next steps like the table: join on repo rank
+    grep "^R$SEP" "$tmp" | sort -t "$SEP" -k2,2n -k3,3 | cut -d "$SEP" -f3 | while IFS= read -r name; do
+      grep "^N$SEP$name$SEP" "$tmp" | while IFS="$SEP" read -r _ n text; do
+        echo "- $n: $text"
+      done
+    done
+  else
+    echo "Nothing to do."
+  fi
+}
+
+clip_detail() { # keep at most MAX_BRANCH_LINES "; " separated items
+  printf '%s' "$1" | awk -v max="$MAX_BRANCH_LINES" 'BEGIN{RS="; "; ORS=""} {n++; if (n<=max) printf "%s%s", (n>1?"; ":""), $0} END{if (n>max) printf "; +%d more", n-max}' | tr -d '\n'
+}
+
+# --- main ---------------------------------------------------------------------
+if [ "${1:-}" = "--worker" ]; then shift; worker "$@"; exit 0; fi
+
+MODE=${1:-status}; [ "$#" -gt 0 ] && shift
+case $MODE in status|remote|local|full) ;; -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  *) die "unknown mode '$MODE' (use: status, remote, local, full)" ;; esac
+
+DO_FETCH=1
+ARGS=()
+for a in "$@"; do
+  case $a in --no-fetch) DO_FETCH=0 ;; -*) die "unknown option '$a'" ;; *) ARGS+=("$a") ;; esac
+done
+
+TMP=$(mktemp "${TMPDIR:-/tmp}/git-parity.XXXXXX") || die "mktemp failed"
+trap 'rm -f "$TMP" "$TMP.repos"' EXIT
+
+discover ${ARGS[@]+"${ARGS[@]}"} > "$TMP.repos"
+TOTAL=$(grep -c . "$TMP.repos")
+if [ "$TOTAL" -eq 0 ]; then
+  echo "git-parity: no repositories found."
+  echo "Pass paths as arguments, run inside a repository, or list one path per line in $CONFIG_DIR/repos"
+  exit 0
+fi
+
+START=$(date +%s)
+tr '\n' '\0' < "$TMP.repos" | xargs -0 -n 1 -P "$JOBS" bash "$0" --worker "$MODE" "$DO_FETCH" > "$TMP"
+END=$(date +%s)
+
+render "$MODE" "$TMP" "$TOTAL" "$((END - START))"

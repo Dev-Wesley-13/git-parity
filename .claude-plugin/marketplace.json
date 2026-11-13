@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "git-parity",
+  "description": "Keep local and remote git branches in parity across many repositories.",
+  "owner": {
+    "name": "Wesley Rafael Fonseca",
+    "url": "https://github.com/Dev-Wesley-13"
+  },
+  "plugins": [
+    {
+      "name": "git-parity",
+      "description": "Safe multi-repo git sync: fast-forward only, push and PR on confirmation, short report with next steps.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}
