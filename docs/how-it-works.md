@@ -81,6 +81,18 @@ capped per repository.
   prints one line, or nothing. It exits immediately unless
   `session_hook=on` is in the config file.
 
+## One repository, three agents
+
+| Agent | Reads | How the script runs |
+|---|---|---|
+| Claude Code | `.claude-plugin/`, `skills/`, `hooks/claude-hooks.json` | Injected when the skill loads |
+| Codex | `.codex-plugin/`, `.agents/plugins/marketplace.json`, `skills/` | The agent runs it, following the skill |
+| Gemini CLI | `gemini-extension.json`, `commands/git-parity/*.toml`, `skills/` | Injected by the command, after you confirm |
+
+The Gemini commands call the script at `~/.gemini/extensions/git-parity/`, where
+`gemini extensions install` puts it. An extension added with `extensions link`
+lives elsewhere, so use the skills there instead of the slash commands.
+
 ## Running the script directly
 
 It has no dependency on Claude Code:

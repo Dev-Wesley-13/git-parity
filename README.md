@@ -3,7 +3,7 @@
 [![CI](https://github.com/Dev-Wesley-13/git-parity/actions/workflows/ci.yml/badge.svg)](https://github.com/Dev-Wesley-13/git-parity/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Keep local and remote git branches in parity across all your repositories, from one Claude Code command.**
+**Keep local and remote git branches in parity across all your repositories, from one command in Claude Code, Codex or Gemini CLI.**
 
 `git-parity` checks every repository you work on, fast-forwards what is safe to
 fast-forward, offers to push what is only on your machine, and gives you one short
@@ -45,7 +45,7 @@ Next steps
 
 ## Install
 
-In Claude Code:
+### Claude Code
 
 ```
 /plugin marketplace add Dev-Wesley-13/git-parity
@@ -54,6 +54,39 @@ In Claude Code:
 
 Update with `/plugin update git-parity@git-parity`. Remove with
 `/plugin uninstall git-parity@git-parity`.
+
+### Codex
+
+```bash
+codex plugin marketplace add Dev-Wesley-13/git-parity
+codex plugin add git-parity@git-parity
+```
+
+The skills are then available by name: ask for "git-parity status", or type `$`
+and pick one.
+
+### Gemini CLI
+
+```bash
+gemini extensions install https://github.com/Dev-Wesley-13/git-parity
+```
+
+Commands are `/git-parity:status`, `/git-parity:remote` and so on. Gemini CLI
+asks you to confirm the script the first time each command runs.
+
+### What works where
+
+| | Claude Code | Codex | Gemini CLI |
+|---|---|---|---|
+| All eight commands | Yes | Yes, as skills | Yes |
+| Report arrives without an extra tool call | Yes | No, the agent runs the script once | Yes |
+| Session-start reminder | Yes (opt-in) | No | No |
+| Tested by | Automated suite and real sessions | Installs and loads; see note | Validates and loads; see note |
+
+Note: on Codex and Gemini CLI the plugin was verified to install and to expose
+every skill and command, with the same script and test suite underneath. Full
+conversations on those two agents have not been exercised by the author yet.
+[Reports](https://github.com/Dev-Wesley-13/git-parity/issues) are welcome.
 
 Requirements: git 2.23+, bash 3.2+ (Linux, macOS, WSL, Git Bash).
 
@@ -176,6 +209,7 @@ collapsed into the `Clean` line.
 - [Guide](docs/guide.md): solo, team, large repositories, many repositories.
 - [How it works](docs/how-it-works.md): architecture and every decision the script makes.
 - [Safety](docs/safety.md): the full list of what it never does.
+- [Testing on each agent](docs/testing-agents.md): a short manual checklist.
 
 ## Development
 

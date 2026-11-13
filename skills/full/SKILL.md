@@ -1,6 +1,6 @@
 ---
 name: full
-description: Full two-way sync across all tracked repositories - fast-forward local branches from the remote, then offer to push local work and open pull requests, with a confirmation per repository.
+description: Full two-way sync across all tracked repositories - fast-forward local branches from the remote, then offer to push local work and open pull requests, with a confirmation per repository. Run only when the user explicitly asks for a full sync.
 argument-hint: "[repo-path ...]"
 disable-model-invocation: true
 allowed-tools: Bash(bash *git-parity.sh*)
@@ -12,7 +12,7 @@ Report (already generated; branches strictly behind were fast-forwarded first, t
 
 !`bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" full $ARGUMENTS`
 
-If no report appears above, run `bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" full $ARGUMENTS` once and use its output.
+If no report appears above (only Claude Code runs that line), run the script once yourself and use its output: `bash <plugin-root>/scripts/git-parity.sh full <arguments the user gave>`, where `<plugin-root>` is two directories above this file.
 
 ## What to do
 

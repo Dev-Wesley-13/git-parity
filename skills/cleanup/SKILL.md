@@ -1,6 +1,6 @@
 ---
 name: cleanup
-description: List local branches that are already merged and stale worktree records across all tracked repositories, then delete only what the user approves.
+description: List local branches that are already merged and stale worktree records across all tracked repositories, then delete only what the user approves. Run only when the user explicitly asks to clean up branches.
 argument-hint: "[group|repo-path ...]"
 disable-model-invocation: true
 allowed-tools: Bash(bash *git-parity.sh*)
@@ -12,7 +12,7 @@ Report (already generated; nothing was deleted):
 
 !`bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" cleanup $ARGUMENTS`
 
-If no report appears above, run `bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" cleanup $ARGUMENTS` once and use its output.
+If no report appears above (only Claude Code runs that line), run the script once yourself and use its output: `bash <plugin-root>/scripts/git-parity.sh cleanup <arguments the user gave>`, where `<plugin-root>` is two directories above this file.
 
 ## What to do
 

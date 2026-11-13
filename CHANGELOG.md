@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-11-13
+
+### Added
+
+- Codex support: `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json`.
+- Gemini CLI support: `gemini-extension.json` and `/git-parity:*` commands.
+- Skills no longer depend on Claude Code to locate the script: other agents are
+  told where it is and run it once.
+- The script accepts all arguments as one quoted string and ignores empty ones,
+  which is how some agents pass them.
+
+### Changed
+
+- Skills that write (`remote`, `local`, `full`, `cleanup`) say in their
+  description that they run only on explicit request, for agents that do not
+  support user-only skills.
+
 ## [1.2.0] - 2026-11-13
 
 ### Added

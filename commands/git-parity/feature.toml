@@ -1,0 +1,6 @@
+description = "Where the branches of one feature stand in every repository."
+prompt = """
+Show the table below as is and say what blocks the feature from being merged (unpushed work, missing pull requests, stacked order). Present it in the user's language; keep repository names, branch names, states and commands verbatim. If it asks for a pattern, ask the user for the feature's branch name. Do not run any other command.
+
+!{bash ~/.gemini/extensions/git-parity/scripts/git-parity.sh feature {{args}}}
+"""

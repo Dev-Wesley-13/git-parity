@@ -11,7 +11,7 @@ Report (already generated, nothing was changed; only `git fetch` ran):
 
 !`bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" status $ARGUMENTS`
 
-If no report appears above, run `bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" status $ARGUMENTS` once and use its output.
+If no report appears above (only Claude Code runs that line), run the script once yourself and use its output: `bash <plugin-root>/scripts/git-parity.sh status <arguments the user gave>`, where `<plugin-root>` is two directories above this file.
 
 ## What to do
 

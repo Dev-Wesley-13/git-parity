@@ -758,22 +758,31 @@ MODE=${1:-status}; [ "$#" -gt 0 ] && shift
 case $MODE in status|remote|local|full|feature|cleanup|prs|whats-new) ;; -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   *) die "unknown mode '$MODE' (use: status, remote, local, full, feature, cleanup, prs, whats-new)" ;; esac
 
-PATTERN=""
-if [ "$MODE" = feature ]; then
-  PATTERN=${1:-}
-  case $PATTERN in
-    ""|-*) # exit 0 on purpose: a skill that injects this output must still load and ask the user
-      echo "git-parity feature: a branch name or pattern is needed, for example: feature login   or   feature 'feat/login*'"
-      exit 0 ;;
-  esac
-  shift
-fi
-
+# Some agents pass everything the user typed as one quoted argument ("web --no-fetch"),
+# or an empty string when nothing was typed. Split those, unless it is a real path with spaces.
 DO_FETCH=1
 ARGS=()
 for a in "$@"; do
-  case $a in --no-fetch) DO_FETCH=0 ;; -*) die "unknown option '$a'" ;; *) ARGS+=("$a") ;; esac
+  if [ -z "$a" ]; then continue; fi
+  case $a in
+    *" "*) if [ -e "$a" ]; then set -- "$a"; else set -f; IFS=' ' read -r -a _words <<<"$a"; set +f; set -- ${_words[@]+"${_words[@]}"}; fi ;;
+    *) set -- "$a" ;;
+  esac
+  for w in "$@"; do
+    case $w in --no-fetch) DO_FETCH=0 ;; -*) die "unknown option '$w'" ;; *) ARGS+=("$w") ;; esac
+  done
 done
+
+PATTERN=""
+if [ "$MODE" = feature ]; then
+  PATTERN=${ARGS[0]:-}
+  if [ -z "$PATTERN" ]; then
+    # exit 0 on purpose: a skill that injects this output must still load and ask the user
+    echo "git-parity feature: a branch name or pattern is needed, for example: feature login   or   feature 'feat/login*'"
+    exit 0
+  fi
+  ARGS=(${ARGS[@]+"${ARGS[@]:1}"})
+fi
 
 TMP=$(mktemp "${TMPDIR:-/tmp}/git-parity.XXXXXX") || die "mktemp failed"
 trap 'rm -f "$TMP" "$TMP.repos"' EXIT

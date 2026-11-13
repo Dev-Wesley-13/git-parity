@@ -1,0 +1,6 @@
+description = "My open pull/merge requests and the ones waiting for my review."
+prompt = """
+Show the report below as is with one sentence of summary. Present it in the user's language; keep repository names, branch names, states and commands verbatim. Do not merge, close, approve or comment on anything.
+
+!{bash ~/.gemini/extensions/git-parity/scripts/git-parity.sh prs {{args}}}
+"""

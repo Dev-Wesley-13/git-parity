@@ -11,7 +11,7 @@ Report (already generated, nothing was changed; only `git fetch` ran):
 
 !`bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" feature $ARGUMENTS`
 
-If no report appears above, run `bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" feature $ARGUMENTS` once and use its output. If the report says a pattern is needed, ask the user for the feature's branch name or a part of it.
+If no report appears above (only Claude Code runs that line), run the script once yourself and use its output: `bash <plugin-root>/scripts/git-parity.sh feature <arguments the user gave>`, where `<plugin-root>` is two directories above this file. If the report says a pattern is needed, ask the user for the feature's branch name or a part of it.
 
 ## What to do
 

@@ -1,6 +1,6 @@
 ---
 name: remote
-description: Bring remote changes into local branches across all tracked repositories using fast-forward only, then report what changed.
+description: Bring remote changes into local branches across all tracked repositories using fast-forward only, then report what changed. Run only when the user explicitly asks to sync, pull or update their repositories.
 argument-hint: "[repo-path ...]"
 disable-model-invocation: true
 allowed-tools: Bash(bash *git-parity.sh*)
@@ -12,7 +12,7 @@ Report (already generated; branches strictly behind their remote were fast-forwa
 
 !`bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" remote $ARGUMENTS`
 
-If no report appears above, run `bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" remote $ARGUMENTS` once and use its output.
+If no report appears above (only Claude Code runs that line), run the script once yourself and use its output: `bash <plugin-root>/scripts/git-parity.sh remote <arguments the user gave>`, where `<plugin-root>` is two directories above this file.
 
 ## What to do
 

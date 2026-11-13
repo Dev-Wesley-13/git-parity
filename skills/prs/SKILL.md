@@ -11,7 +11,7 @@ Report (already generated, nothing was changed):
 
 !`bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" prs $ARGUMENTS`
 
-If no report appears above, run `bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" prs $ARGUMENTS` once and use its output.
+If no report appears above (only Claude Code runs that line), run the script once yourself and use its output: `bash <plugin-root>/scripts/git-parity.sh prs <arguments the user gave>`, where `<plugin-root>` is two directories above this file.
 
 ## What to do
 

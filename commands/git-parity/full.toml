@@ -1,0 +1,6 @@
+description = "Two-way sync: fast-forward from the remote, then offer to push local work."
+prompt = """
+The report below was produced after fast-forwarding every branch that was strictly behind. Show it as is. Present it in the user's language; keep repository names, branch names, states and commands verbatim. Then, if it has a 'Push candidates' section, ask which ones to push, one decision per repository and branch, and run exactly the printed command for each approval. Never force, never push an unlisted branch, never commit, stash, reset, rebase, switch or delete on your own.
+
+!{bash ~/.gemini/extensions/git-parity/scripts/git-parity.sh full {{args}}}
+"""

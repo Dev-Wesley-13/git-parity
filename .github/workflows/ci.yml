@@ -14,10 +14,26 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test suite
         run: bash tests/run.sh
-      - name: Manifests are valid JSON
+      - name: Manifests are valid and consistent
         run: |
-          python3 -m json.tool .claude-plugin/plugin.json > /dev/null
-          python3 -m json.tool .claude-plugin/marketplace.json > /dev/null
+          python3 - <<'PY'
+          import glob, json
+          files = [".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", ".codex-plugin/plugin.json",
+                   ".agents/plugins/marketplace.json", "gemini-extension.json", "hooks/claude-hooks.json"]
+          data = {f: json.load(open(f)) for f in files}
+          versions = {data[f]["version"] for f in (".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "gemini-extension.json")}
+          assert len(versions) == 1, f"version mismatch across manifests: {versions}"
+          skills = sorted(p.split("/")[1] for p in glob.glob("skills/*/SKILL.md"))
+          commands = sorted(p.split("/")[-1][:-5] for p in glob.glob("commands/git-parity/*.toml"))
+          assert skills == commands, f"skills and Gemini commands differ: {skills} vs {commands}"
+          try:
+              import tomllib
+              for p in glob.glob("commands/git-parity/*.toml"):
+                  tomllib.load(open(p, "rb"))
+          except ModuleNotFoundError:
+              pass
+          print("manifests ok:", versions.pop(), len(skills), "skills")
+          PY
 
   shellcheck:
     runs-on: ubuntu-latest

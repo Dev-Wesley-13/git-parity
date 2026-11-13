@@ -1,6 +1,6 @@
 # git-parity
 
-**Mantenha branches locais e remotas em paridade em todos os seus repositórios, com um comando do Claude Code.**
+**Mantenha branches locais e remotas em paridade em todos os seus repositórios, com um comando no Claude Code, Codex ou Gemini CLI.**
 
 O `git-parity` verifica cada repositório em que você trabalha, faz fast-forward do
 que é seguro, oferece enviar o que só existe na sua máquina e entrega um relatório
@@ -53,6 +53,23 @@ No Claude Code:
 
 Atualize com `/plugin update git-parity@git-parity`. Remova com
 `/plugin uninstall git-parity@git-parity`.
+
+No Codex:
+
+```bash
+codex plugin marketplace add Dev-Wesley-13/git-parity
+codex plugin add git-parity@git-parity
+```
+
+No Gemini CLI:
+
+```bash
+gemini extensions install https://github.com/Dev-Wesley-13/git-parity
+```
+
+No Codex e no Gemini CLI a instalação e o carregamento das skills e comandos
+foram verificados; conversas completas nesses dois agentes ainda não foram
+exercitadas pelo autor. O lembrete de início de sessão existe só no Claude Code.
 
 Requisitos: git 2.23+, bash 3.2+ (Linux, macOS, WSL, Git Bash).
 

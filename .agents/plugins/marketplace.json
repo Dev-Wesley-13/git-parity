@@ -1,0 +1,21 @@
+{
+  "name": "git-parity",
+  "interface": {
+    "displayName": "git-parity"
+  },
+  "plugins": [
+    {
+      "name": "git-parity",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/Dev-Wesley-13/git-parity.git",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

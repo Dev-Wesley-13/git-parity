@@ -1,0 +1,6 @@
+description = "List merged branches and stale worktree records; delete only what is approved."
+prompt = """
+Nothing was deleted yet. Show the report below grouped as it is. Present it in the user's language; keep repository names, branch names, states and commands verbatim. Ask what to delete, one decision per repository and group, and run exactly the printed command for each approval. Never delete anything listed as not verified, the current branch, the base branch or a remote branch.
+
+!{bash ~/.gemini/extensions/git-parity/scripts/git-parity.sh cleanup {{args}}}
+"""

@@ -1,0 +1,38 @@
+{
+  "name": "git-parity",
+  "version": "1.3.0",
+  "description": "Keep local and remote git branches in parity across many repositories: safe fast-forward sync, push and PR offers, and a short report with next steps.",
+  "author": {
+    "name": "Wesley Rafael Fonseca",
+    "url": "https://github.com/Dev-Wesley-13"
+  },
+  "homepage": "https://github.com/Dev-Wesley-13/git-parity",
+  "repository": "https://github.com/Dev-Wesley-13/git-parity",
+  "license": "MIT",
+  "keywords": [
+    "git",
+    "sync",
+    "multi-repo",
+    "branches",
+    "pull-request"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "git-parity",
+    "shortDescription": "Multi-repo git sync with a short report",
+    "longDescription": "Check every repository you work on, fast-forward what is safe, offer to push what is only local, and get one short report with the next step for everything else. Never forces, resets, stashes or pushes without a yes.",
+    "developerName": "Wesley Rafael Fonseca",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Are my repositories in sync with their remotes?",
+      "Bring all my repositories up to date.",
+      "What have I not pushed yet?"
+    ],
+    "websiteURL": "https://github.com/Dev-Wesley-13/git-parity"
+  }
+}

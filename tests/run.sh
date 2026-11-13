@@ -395,6 +395,17 @@ printf '%s\n' "$H1" > "$GIT_PARITY_CONFIG_DIR/repos"
 eq  "hook/silent when clean" "$(bash "$GP" hook)" ""
 rm "$GIT_PARITY_CONFIG_DIR/repos" "$GIT_PARITY_CONFIG_DIR/config"
 
+# 27. arguments from agents that pass one quoted string, or an empty one
+Q1=$(new q-a); Q2=$(new q-b)
+out=$(bash "$GP" status "");                    has "args/empty string ignored" "$out" "repo(s)"
+hasnt "args/empty string is not a path" "$out" "ERROR"
+out=$(bash "$GP" status "$Q1 $Q2 --no-fetch");  has "args/one string split" "$out" "2 repo(s)"
+has "args/flag inside the string" "$out" "no fetch"
+g "$Q1" checkout -q -b feat/zed; commit "$Q1" z
+out=$(bash "$GP" feature "zed $Q1 --no-fetch"); has "args/feature pattern from one string" "$out" "| q-a | feat/zed |"
+out=$(bash "$GP" feature "");                   has "args/feature empty string" "$out" "a branch name or pattern is needed"
+out=$(bash "$GP" status --no-fetch "$T/with space/sp"); has "args/real path with spaces kept" "$out" "| sp | main |"
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]
