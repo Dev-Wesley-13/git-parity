@@ -56,6 +56,18 @@ capped per repository.
 - **Ordering.** `DIVERGED`, `ERROR`, `IN-PROGRESS`, `STALE`, `DIRTY`, `AHEAD`,
   `BEHIND`/`DETACHED`, `NO-UPSTREAM`/`GONE`, `BRANCHES`, `OK`.
 
+## feature and cleanup
+
+- **feature** lists local and remote branches matching the pattern, counts
+  commits against the base, and asks `gh` for the pull request of each pushed
+  branch. A branch is "stacked on" another matched branch when that branch is an
+  ancestor of it; rows are ordered by commits ahead, which is the merge order.
+- **cleanup** offers a branch for deletion only with proof: either it is an
+  ancestor of the base (`git merge-base --is-ancestor`), or its remote branch is
+  gone and `gh` finds a merged pull request for it. The current branch, the base,
+  protected names and branches checked out in a worktree are never listed.
+  The script only prints commands; deleting is done by the skill after you approve.
+
 ## Running the script directly
 
 It has no dependency on Claude Code:
@@ -63,4 +75,6 @@ It has no dependency on Claude Code:
 ```bash
 bash scripts/git-parity.sh status ~/code/api ~/code/web
 bash scripts/git-parity.sh remote --no-fetch
+bash scripts/git-parity.sh feature 'feat/login*' work
+bash scripts/git-parity.sh cleanup
 ```

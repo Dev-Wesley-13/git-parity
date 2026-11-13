@@ -25,7 +25,10 @@ behind their own upstream.
 - commit on your behalf;
 - resolve a divergence on their own.
 
-The skills do not pre-approve `git push` or `gh pr create`. Besides the question
+The one skill that deletes is `cleanup`, and only local branches the script
+proved merged, one approval per repository. It never deletes remote branches.
+
+The skills do not pre-approve `git push`, `gh pr create` or `git branch -D`. Besides the question
 Claude asks you, Claude Code's own permission prompt still applies.
 
 ## How this is checked

@@ -64,8 +64,11 @@ Requisitos: git 2.23+, bash 3.2+ (Linux, macOS, WSL, Git Bash).
 | `/git-parity:remote` | Traz o remoto: fast-forward de toda branch que está só atrás. | Branches locais, só fast-forward. |
 | `/git-parity:local` | Acha trabalho que só existe na sua máquina e oferece push e pull request. | Remoto, após você confirmar cada um. |
 | `/git-parity:full` | `remote`, depois `local`. | Ambos, mesmas regras. |
+| `/git-parity:feature <nome>` | Onde estão as branches de uma feature em cada repositório: à frente da base, enviada, pull request, ordem de merge. | Nada. |
+| `/git-parity:cleanup` | Lista branches já mergeadas e registros de worktree obsoletos, apaga o que você aprovar. | Branches locais, após você confirmar. |
 
-Todo comando aceita caminhos: `/git-parity:status ~/code/api ~/code/web`.
+Todo comando aceita caminhos ou nomes de grupo:
+`/git-parity:status ~/code/api ~/code/web`, `/git-parity:remote trabalho`.
 
 ## Quais repositórios
 
@@ -75,6 +78,22 @@ Vale a primeira fonte que retornar algo:
 2. `~/.config/git-parity/repos`, um caminho por linha (`#` inicia comentário, `~` é expandido).
 3. O repositório em que você está.
 4. Repositórios até dois níveis abaixo do diretório atual.
+
+No arquivo `repos`, uma linha `[nome]` inicia um grupo. Sem argumento, todos os
+caminhos são usados; `/git-parity:status trabalho` verifica só aquele grupo.
+
+```
+# ~/.config/git-parity/repos
+[trabalho]
+~/trabalho/api
+~/trabalho/web
+```
+
+## Forks
+
+Se o repositório tem um remoto chamado `upstream`, a base segue ele: `remote`
+faz fast-forward da base local a partir do `upstream`, e o relatório mostra
+`FORK-BEHIND n` até você enviar a base para o seu fork.
 
 ## Branches protegidas
 
@@ -97,6 +116,7 @@ As linhas vêm ordenadas por urgência. Repositórios sem nada a dizer ficam na 
 | `DETACHED` | Nenhuma branch em uso. | Nada. |
 | `NO-UPSTREAM` | Branch nunca enviada. | Oferece push em `local`/`full`. |
 | `GONE` | Branch remota apagada, em geral após merge. | Nada. |
+| `FORK-BEHIND n` | A base do seu fork está `n` commits atrás do `upstream`. | Fast-forward da base local em `remote`/`full`; o push é seu. |
 | `BRANCHES` | Branch atual em ordem; outra branch pede atenção. | Veja Detail. |
 | `OK` | Limpo, com algo que vale saber (ex.: `main updated +3`). | Feito. |
 

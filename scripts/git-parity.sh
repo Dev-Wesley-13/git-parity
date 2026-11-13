@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # git-parity: report (and safely fast-forward) the state of many git repositories.
 #
-# Usage: git-parity.sh <status|remote|local|full> [--no-fetch] [repo-path ...]
+# Usage: git-parity.sh <status|remote|local|full|cleanup> [--no-fetch] [repo-path|group ...]
+#        git-parity.sh feature <branch-pattern> [--no-fetch] [repo-path|group ...]
 #
-#   status  read-only report (only runs `git fetch`)
-#   remote  status + fast-forward local branches that are strictly behind
-#   local   status, with push candidates listed under "Push candidates"
-#   full    remote + local
+#   status   read-only report (only runs `git fetch`)
+#   remote   status + fast-forward local branches that are strictly behind
+#   local    status, with push candidates listed under "Push candidates"
+#   full     remote + local
+#   feature  where the branches of one feature stand in every repository
+#   cleanup  list branches and worktrees that are safe to delete (deletes nothing)
 #
 # Never pushes, forces, resets, stashes, commits, deletes or checks out anything.
 # Bash 3.2 compatible (macOS): no associative arrays, no mapfile.
@@ -39,9 +42,9 @@ qpath() { # shell-quoted path, with $HOME shown as ~ so commands stay short
 
 run_fetch() {
   if command -v timeout >/dev/null 2>&1; then
-    timeout "$FETCH_TIMEOUT" git -C "$1" fetch --prune --quiet 2>/dev/null
+    timeout "$FETCH_TIMEOUT" git -C "$1" fetch --prune --quiet ${2:+"$2"} 2>/dev/null
   else
-    git -C "$1" fetch --prune --quiet 2>/dev/null
+    git -C "$1" fetch --prune --quiet ${2:+"$2"} 2>/dev/null
   fi
 }
 
@@ -84,6 +87,7 @@ worker() {
   local stale=""
   if [ "$do_fetch" = 1 ] && [ -n "$(git -C "$repo" remote)" ]; then
     run_fetch "$repo" || stale=1
+    if git -C "$repo" remote | grep -qx upstream; then run_fetch "$repo" upstream || stale=1; fi
   fi
 
   local gitdir; gitdir=$(git -C "$repo" rev-parse --absolute-git-dir)
@@ -228,6 +232,28 @@ EOF
     state="BRANCHES"; rank=8
   fi
 
+  # fork: compare the base with the repository it was forked from (remote "upstream")
+  if [ -n "$base" ] && git -C "$repo" show-ref --verify --quiet "refs/remotes/upstream/$base"; then
+    local fork_behind local_behind up_ref="refs/remotes/upstream/$base"
+    local_behind=$(git -C "$repo" rev-list --count "refs/heads/$base..$up_ref" 2>/dev/null || echo 0)
+    if [ "$do_ff" = 1 ] && [ "$local_behind" -gt 0 ] \
+       && [ "$(git -C "$repo" rev-list --count "$up_ref..refs/heads/$base" 2>/dev/null)" = 0 ]; then
+      if [ "$base" = "$branch" ]; then
+        if [ "$dirty" = 0 ] && [ -z "$inprog" ] && git -C "$repo" merge --ff-only --quiet "$up_ref" >/dev/null 2>&1; then
+          updated="$updated; $base updated +$local_behind from upstream"
+        fi
+      elif git -C "$repo" fetch --quiet . "$up_ref:refs/heads/$base" 2>/dev/null; then
+        updated="$updated; $base updated +$local_behind from upstream"
+      fi
+    fi
+    fork_behind=$(git -C "$repo" rev-list --count "refs/remotes/origin/$base..$up_ref" 2>/dev/null || echo 0)
+    if [ "$fork_behind" -gt 0 ]; then
+      notes="$notes; fork: origin/$base is $fork_behind behind upstream/$base"
+      if [ "$state" = "CLEAN" ]; then state="FORK-BEHIND $fork_behind"; rank=6; fi
+      [ -z "$next" ] && next="sync your fork: run /git-parity:remote, then git -C $q push origin $base"
+    fi
+  fi
+
   # remote branches not merged into the base that have no local branch (someone else's work, or yours from another machine)
   if [ -n "$base" ]; then
     local remote_only count
@@ -258,19 +284,29 @@ EOF
 }
 
 # --- repo discovery -----------------------------------------------------------
-discover() {
-  if [ "$#" -gt 0 ]; then printf '%s\n' "$@"; return; fi
-  if [ -f "$CONFIG_DIR/repos" ]; then
-    local line
-    while IFS= read -r line || [ -n "$line" ]; do
-      line="${line%%#*}"
-      line=$(printf '%s' "$line" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
-      [ -n "$line" ] || continue
-      case $line in "~"*) line="$HOME${line#\~}" ;; esac
-      printf '%s\n' "$line"
-    done < "$CONFIG_DIR/repos"
+repos_file() { # [group] -> paths from the repos file; no group = every path
+  local want=${1:-} section="" line
+  [ -f "$CONFIG_DIR/repos" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%%#*}"
+    line=$(printf '%s' "$line" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+    [ -n "$line" ] || continue
+    case $line in "["*"]") section=${line#[}; section=${section%]}; continue ;; esac
+    if [ -n "$want" ] && [ "$section" != "$want" ]; then continue; fi
+    case $line in "~"*) line="$HOME${line#\~}" ;; esac
+    printf '%s\n' "$line"
+  done < "$CONFIG_DIR/repos"
+}
+
+discover() { # each argument is a path, or the name of a [group] in the repos file
+  local a
+  if [ "$#" -gt 0 ]; then
+    for a in "$@"; do
+      if [ ! -d "$a" ] && [ -n "$(repos_file "$a")" ]; then repos_file "$a"; else printf '%s\n' "$a"; fi
+    done
     return
   fi
+  if [ -n "$(repos_file)" ]; then repos_file; return; fi
   local top; top=$(git rev-parse --show-toplevel 2>/dev/null)
   if [ -n "$top" ]; then printf '%s\n' "$top"; return; fi
   find . -mindepth 2 -maxdepth 3 -name .git -prune 2>/dev/null | sed 's|/\.git$||; s|^\./||' | sort
@@ -329,12 +365,194 @@ clip_detail() { # keep at most MAX_BRANCH_LINES "; " separated items
   printf '%s' "$1" | awk -v max="$MAX_BRANCH_LINES" 'BEGIN{RS="; "; ORS=""} {n++; if (n<=max) printf "%s%s", (n>1?"; ":""), $0} END{if (n>max) printf "; +%d more", n-max}' | tr -d '\n'
 }
 
+# --- feature: where do the branches of one feature stand ---------------------------
+# Records: F <name> <order> <branch> <vs base> <remote> <pr> <note> | X <name> | N <name> <text>
+
+pr_lookup() { # repo branch state-filter -> "#12 OPEN" (empty when gh is missing or nothing found)
+  command -v gh >/dev/null 2>&1 || return 0
+  (cd "$1" && gh pr list --head "$2" --state "$3" --limit 1 --json number,state,isDraft \
+     -q '.[0] | select(.) | "#\(.number) \(if .isDraft then "DRAFT" else .state end)"' 2>/dev/null)
+}
+
+branch_ref() { # repo branch -> local ref if it exists, else the remote-tracking ref
+  if git -C "$1" show-ref --verify --quiet "refs/heads/$2"; then echo "refs/heads/$2"; else echo "refs/remotes/origin/$2"; fi
+}
+
+feature_worker() {
+  local pattern=$1 do_fetch=$2 repo=$3
+  local name q base b; name=$(basename "$repo"); q=$(qpath "$repo")
+  git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || { printf 'X%s%s\n' "$SEP" "$name"; return 0; }
+  [ "$do_fetch" = 1 ] && [ -n "$(git -C "$repo" remote)" ] && run_fetch "$repo"
+  base=$(detect_base "$repo")
+  case $pattern in *[*?[]*) ;; *) pattern="*$pattern*" ;; esac
+
+  local matched=""
+  while IFS= read -r b; do
+    [ -n "$b" ] && [ "$b" != "$base" ] && [ "$b" != HEAD ] || continue
+    # shellcheck disable=SC2254
+    case $b in $pattern) matched="$matched$b"$'\n' ;; esac
+  done < <( { git -C "$repo" for-each-ref --format='%(refname:short)' refs/heads
+              git -C "$repo" for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin; } 2>/dev/null | sort -u)
+  [ -n "$matched" ] || { printf 'X%s%s\n' "$SEP" "$name"; return 0; }
+
+  local ref has_local has_remote ahead behind vs remote pr note other parent parent_ahead oa n
+  while IFS= read -r b; do
+    [ -n "$b" ] || continue
+    has_local=""; has_remote=""
+    git -C "$repo" show-ref --verify --quiet "refs/heads/$b" && has_local=1
+    git -C "$repo" show-ref --verify --quiet "refs/remotes/origin/$b" && has_remote=1
+    ref=$(branch_ref "$repo" "$b")
+    ahead=0; behind=0
+    if [ -n "$base" ]; then
+      ahead=$(git -C "$repo" rev-list --count "refs/remotes/origin/$base..$ref" 2>/dev/null || echo 0)
+      behind=$(git -C "$repo" rev-list --count "$ref..refs/remotes/origin/$base" 2>/dev/null || echo 0)
+    fi
+    if [ "$ahead" = 0 ]; then vs="merged"; else vs="+$ahead"; [ "$behind" -gt 0 ] && vs="$vs / -$behind"; fi
+
+    if [ -n "$has_local" ] && [ -n "$has_remote" ]; then
+      n=$(git -C "$repo" rev-list --count "refs/remotes/origin/$b..refs/heads/$b")
+      if [ "$n" -gt 0 ]; then
+        remote="$n unpushed"
+        printf 'N%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$ahead" "$SEP" "push $b: git -C $q push origin $b"
+      elif [ "$(git -C "$repo" rev-list --count "refs/heads/$b..refs/remotes/origin/$b")" -gt 0 ]; then
+        remote="behind remote"
+      else
+        remote="pushed"
+      fi
+    elif [ -n "$has_local" ]; then
+      remote="never pushed"
+      [ "$ahead" != 0 ] && printf 'N%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$ahead" "$SEP" "publish $b: git -C $q push -u origin $b"
+    else
+      remote="remote only"
+    fi
+
+    pr="-"
+    if [ -n "$has_remote" ]; then
+      pr=$(pr_lookup "$repo" "$b" all); [ -n "$pr" ] || pr="none"
+      if [ "$pr" = "none" ] && [ "$ahead" != 0 ] && [ "$remote" = "pushed" ]; then
+        printf 'N%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$ahead" "$SEP" "open a PR for $b: (cd $q && gh pr create --head $b --fill)"
+      fi
+    fi
+
+    # stacked: the closest other matched branch that is an ancestor of this one
+    parent=""; parent_ahead=0; note=""
+    while IFS= read -r other; do
+      [ -n "$other" ] && [ "$other" != "$b" ] || continue
+      oa=$(branch_ref "$repo" "$other")
+      if git -C "$repo" merge-base --is-ancestor "$oa" "$ref" 2>/dev/null; then
+        n=$(git -C "$repo" rev-list --count "refs/remotes/origin/${base:-HEAD}..$oa" 2>/dev/null || echo 0)
+        if [ "$n" -gt "$parent_ahead" ] && [ "$n" -lt "$ahead" ]; then parent=$other; parent_ahead=$n; fi
+      fi
+    done <<<"$matched"
+    [ -n "$parent" ] && note="stacked on $parent: merge that one first"
+    printf 'F%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$ahead" "$SEP" "$b" "$SEP" "$vs" "$SEP" "$remote" "$SEP" "$pr" "$SEP" "$note"
+  done <<<"$matched"
+  return 0
+}
+
+render_feature() {
+  local pattern=$1 tmp=$2 total=$3
+  echo "git-parity feature '$pattern' · $total repo(s) · $(grep -c "^F$SEP" "$tmp") branch(es)"
+  echo
+  if grep -q "^F$SEP" "$tmp"; then
+    echo "| Repo | Branch | vs base | Remote | PR | Note |"
+    echo "|---|---|---|---|---|---|"
+    grep "^F$SEP" "$tmp" | sort -t "$SEP" -k2,2 -k3,3n | while IFS="$SEP" read -r _ name _ branch vs remote pr note; do
+      echo "| $name | $branch | $vs | $remote | $pr | $note |"
+    done
+    echo
+    echo "Rows are in merge order inside each repository. 'vs base' = commits ahead / behind the base branch."
+    echo
+  fi
+  local missing; missing=$(grep "^X$SEP" "$tmp" | cut -d "$SEP" -f2 | sort | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+  if [ -n "$missing" ]; then echo "No matching branch in: $missing"; echo; fi
+  if grep -q "^N$SEP" "$tmp"; then
+    echo "Next steps"
+    grep "^N$SEP" "$tmp" | sort -t "$SEP" -k2,2 -k3,3n | while IFS="$SEP" read -r _ n _ text; do echo "- $n: $text"; done
+  else
+    echo "Nothing to do."
+  fi
+}
+
+# --- cleanup: what is safe to delete (this script deletes nothing) -----------------
+# Records: D <name> <kind> <branch> <evidence> <command>
+
+cleanup_worker() {
+  local do_fetch=$1 repo=$2
+  local name q base branch b track pr in_worktrees; name=$(basename "$repo"); q=$(qpath "$repo")
+  git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || return 0
+  [ "$do_fetch" = 1 ] && [ -n "$(git -C "$repo" remote)" ] && run_fetch "$repo"
+  base=$(detect_base "$repo"); [ -n "$base" ] || return 0
+  branch=$(git -C "$repo" symbolic-ref --quiet --short HEAD 2>/dev/null)
+  in_worktrees=$(git -C "$repo" worktree list --porcelain 2>/dev/null | sed -n 's|^branch refs/heads/||p')
+  while IFS="$SEP" read -r b track; do
+    [ -n "$b" ] && [ "$b" != "$base" ] && [ "$b" != "$branch" ] || continue
+    printf '%s\n' "$in_worktrees" | grep -qxF -- "$b" && continue
+    never_push "$b" "$base" && continue
+    if git -C "$repo" merge-base --is-ancestor "refs/heads/$b" "refs/remotes/origin/$base" 2>/dev/null; then
+      printf 'D%s%s%smerged%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$SEP" "$b" "$SEP" "fully contained in origin/$base" "$SEP" "git -C $q branch -D $b"
+    elif [ "$track" = "[gone]" ]; then
+      pr=$(pr_lookup "$repo" "$b" merged)
+      if [ -n "$pr" ]; then
+        printf 'D%s%s%ssquashed%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$SEP" "$b" "$SEP" "remote branch deleted, PR $pr" "$SEP" "git -C $q branch -D $b"
+      else
+        printf 'D%s%s%sunverified%s%s%s%s%s-\n' "$SEP" "$name" "$SEP" "$SEP" "$b" "$SEP" "remote branch deleted, no merged PR found" "$SEP"
+      fi
+    fi
+  done < <(git -C "$repo" for-each-ref --format="%(refname:short)$SEP%(upstream:track)" refs/heads 2>/dev/null)
+  if [ -n "$(git -C "$repo" worktree prune --dry-run 2>&1)" ]; then
+    printf 'D%s%s%sworktree%s-%s%s%s%s\n' "$SEP" "$name" "$SEP" "$SEP" "$SEP" "stale worktree records" "$SEP" "git -C $q worktree prune"
+  fi
+  return 0
+}
+
+render_cleanup() {
+  local tmp=$1 total=$2 kind title n
+  n=$(grep -c "^D$SEP" "$tmp")
+  echo "git-parity cleanup · $total repo(s) · $n item(s) · nothing was deleted"
+  echo
+  if [ "$n" -eq 0 ]; then echo "Nothing to clean."; return; fi
+  for kind in merged squashed worktree unverified; do
+    grep -q "^D${SEP}[^${SEP}]*${SEP}${kind}${SEP}" "$tmp" || continue
+    case $kind in
+      merged) title="Merged into the base (safe to delete)" ;;
+      squashed) title="Squash-merged: remote branch deleted and a merged PR exists (safe to delete)" ;;
+      worktree) title="Stale worktree records" ;;
+      *) title="Remote branch deleted, merge NOT verified (do not delete without checking)" ;;
+    esac
+    echo "$title"
+    # one line per repository: every branch of that kind, and a single command for all of them
+    grep "^D${SEP}[^${SEP}]*${SEP}${kind}${SEP}" "$tmp" | sort -t "$SEP" -k2,2 -k4,4 | awk -F "$SEP" -v kind="$kind" '
+      function flush() {
+        if (name == "") return
+        if (kind == "worktree") printf "- %s · %s\n", name, cmd
+        else if (kind == "unverified") printf "- %s (%d): %s\n", name, n, list
+        else if (kind == "merged") printf "- %s (%d): %s %s\n", name, n, cmd, args
+        else printf "- %s (%d): %s\n  %s %s\n", name, n, list, cmd, args
+      }
+      $2 != name { flush(); name = $2; n = 0; list = ""; args = ""; cmd = $6; sub(/ [^ ]+$/, "", cmd); if (kind == "worktree") cmd = $6 }
+      { n++; list = list (n > 1 ? ", " : "") $4 ($5 ~ /PR #/ ? " (" substr($5, index($5, "PR #")) ")" : ""); args = args (n > 1 ? " " : "") $4 }
+      END { flush() }'
+    echo
+  done
+  echo "Ask before deleting. Run only the commands the user approves."
+}
+
 # --- main ---------------------------------------------------------------------
 if [ "${1:-}" = "--worker" ]; then shift; worker "$@"; exit 0; fi
+if [ "${1:-}" = "--feature-worker" ]; then shift; feature_worker "$@"; exit 0; fi
+if [ "${1:-}" = "--cleanup-worker" ]; then shift; cleanup_worker "$@"; exit 0; fi
 
 MODE=${1:-status}; [ "$#" -gt 0 ] && shift
-case $MODE in status|remote|local|full) ;; -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-  *) die "unknown mode '$MODE' (use: status, remote, local, full)" ;; esac
+case $MODE in status|remote|local|full|feature|cleanup) ;; -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  *) die "unknown mode '$MODE' (use: status, remote, local, full, feature, cleanup)" ;; esac
+
+PATTERN=""
+if [ "$MODE" = feature ]; then
+  PATTERN=${1:-}
+  case $PATTERN in ""|-*) die "feature needs a branch name or pattern, e.g.: feature 'feat/login*'" ;; esac
+  shift
+fi
 
 DO_FETCH=1
 ARGS=()
@@ -354,7 +572,15 @@ if [ "$TOTAL" -eq 0 ]; then
 fi
 
 START=$(date +%s)
-tr '\n' '\0' < "$TMP.repos" | xargs -0 -n 1 -P "$JOBS" bash "$0" --worker "$MODE" "$DO_FETCH" > "$TMP"
-END=$(date +%s)
-
-render "$MODE" "$TMP" "$TOTAL" "$((END - START))"
+case $MODE in
+  feature)
+    tr '\n' '\0' < "$TMP.repos" | xargs -0 -n 1 -P "$JOBS" bash "$0" --feature-worker "$PATTERN" "$DO_FETCH" > "$TMP"
+    render_feature "$PATTERN" "$TMP" "$TOTAL" ;;
+  cleanup)
+    tr '\n' '\0' < "$TMP.repos" | xargs -0 -n 1 -P "$JOBS" bash "$0" --cleanup-worker "$DO_FETCH" > "$TMP"
+    render_cleanup "$TMP" "$TOTAL" ;;
+  *)
+    tr '\n' '\0' < "$TMP.repos" | xargs -0 -n 1 -P "$JOBS" bash "$0" --worker "$MODE" "$DO_FETCH" > "$TMP"
+    END=$(date +%s)
+    render "$MODE" "$TMP" "$TOTAL" "$((END - START))" ;;
+esac

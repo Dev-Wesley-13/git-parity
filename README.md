@@ -65,8 +65,11 @@ Requirements: git 2.23+, bash 3.2+ (Linux, macOS, WSL, Git Bash).
 | `/git-parity:remote` | Brings remote changes in: fast-forwards every branch that is strictly behind. | Local branches, fast-forward only. |
 | `/git-parity:local` | Finds work that is only on your machine and offers push and pull request. | Remote, after you confirm each one. |
 | `/git-parity:full` | `remote`, then `local`. | Both, same rules. |
+| `/git-parity:feature <name>` | Where the branches of one feature stand in every repository: ahead of base, pushed, pull request, merge order. | Nothing. |
+| `/git-parity:cleanup` | Lists merged branches and stale worktree records, deletes what you approve. | Local branches, after you confirm. |
 
-Every command accepts repository paths: `/git-parity:status ~/code/api ~/code/web`.
+Every command accepts repository paths or group names:
+`/git-parity:status ~/code/api ~/code/web`, `/git-parity:remote work`.
 
 ## Which repositories
 
@@ -79,10 +82,42 @@ The first source that yields something wins:
 
 ```
 # ~/.config/git-parity/repos
+~/notes
+
+[work]
 ~/work/api
 ~/work/web
 ~/work/mobile
+
+[oss]
+~/oss/some-fork
 ```
+
+With no argument every path is used. `[name]` starts a group:
+`/git-parity:status work` checks only those three.
+
+## One feature, many repositories
+
+```
+/git-parity:feature checkout work
+```
+
+```
+| Repo | Branch             | vs base | Remote       | PR       | Note                                             |
+|------|--------------------|---------|--------------|----------|--------------------------------------------------|
+| api  | feat/checkout-core | +3      | pushed       | #41 OPEN |                                                  |
+| api  | feat/checkout-tax  | +5      | never pushed | -        | stacked on feat/checkout-core: merge that one first |
+| web  | feat/checkout-page | +2 / -4 | 1 unpushed   | none     |                                                  |
+```
+
+The pattern matches any part of the branch name; globs work too
+(`'feat/checkout-*'`).
+
+## Forks
+
+If a repository has a remote named `upstream`, the base branch follows it:
+`remote` fast-forwards your local base from `upstream`, and the report shows
+`FORK-BEHIND n` until you push the base to your fork.
 
 ## Protected branches
 
@@ -105,6 +140,7 @@ collapsed into the `Clean` line.
 | `DETACHED` | No branch checked out. | Nothing. |
 | `NO-UPSTREAM` | Branch never pushed. | Offers a push in `local`/`full`. |
 | `GONE` | Remote branch was deleted, usually after a merge. | Nothing. |
+| `FORK-BEHIND n` | Your fork's base is `n` commits behind `upstream`. | Fast-forwards the local base in `remote`/`full`; you push it. |
 | `BRANCHES` | Current branch is fine; another branch needs attention. | See Detail. |
 | `OK` | Clean, with something worth knowing (for example `main updated +3`). | Done. |
 
@@ -130,8 +166,8 @@ for any behavior change.
 ## FAQ
 
 **Does it work with GitLab, Bitbucket or a self-hosted server?**
-Yes for `status`, `remote` and pushes: those are plain git. Pull request creation
-uses `gh`, so it is GitHub only for now.
+Yes for `status`, `remote`, `cleanup` and pushes: those are plain git. Pull
+request lookup and creation use `gh`, so they are GitHub only for now.
 
 **Why did it skip a repository?**
 Because acting was not provably safe: uncommitted changes, diverged history, an

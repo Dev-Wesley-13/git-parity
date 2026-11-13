@@ -228,6 +228,87 @@ out=$(bash "$GP" bogus 2>&1); eq "bad mode exit" "$?" "2"
 out=$(cd "$T/scan/a" && bash "$GP" status)
 has "no repos" "$out" "no repositories found"
 
+# --- 1.1.0: groups, feature, cleanup, forks ----------------------------------
+
+# 19. groups in the repos file
+GA=$(new g-a); GB=$(new g-b); GC=$(new g-c)
+printf '%s\n[web]\n%s\n\n[mobile]\n%s\n' "$GA" "$GB" "$GC" > "$GIT_PARITY_CONFIG_DIR/repos"
+out=$(bash "$GP" status --no-fetch);        has "groups/all" "$out" "3 repo(s)"
+out=$(bash "$GP" status --no-fetch web);    has "groups/one" "$out" "Clean (1): g-b"
+out=$(bash "$GP" status --no-fetch web mobile "$GA"); has "groups/mixed with path" "$out" "3 repo(s)"
+out=$(bash "$GP" status --no-fetch nope 2>&1); has "groups/unknown name is a path" "$out" "ERROR"
+rm "$GIT_PARITY_CONFIG_DIR/repos"
+
+# gh stub: prints a PR only for the branch/state named in GH_STUB ("branch:state=text")
+mkdir -p "$T/bin"
+cat > "$T/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+head=""; state=""
+while [ "$#" -gt 0 ]; do
+  case $1 in --head) head=$2; shift ;; --state) state=$2; shift ;; esac
+  shift
+done
+printf '%s\n' "${GH_STUB:-}" | tr ';' '\n' | while IFS='=' read -r key text; do
+  [ "$key" = "$head:$state" ] && echo "$text"
+done
+exit 0
+STUB
+chmod +x "$T/bin/gh"
+
+# 20. feature across repositories, with a stacked branch and PR lookup
+F1=$(new f-api); g "$F1" checkout -q -b feat/pay-core; commit "$F1" a; g "$F1" push -q -u origin feat/pay-core
+g "$F1" checkout -q -b feat/pay-ui; commit "$F1" b; commit "$F1" c
+F2=$(new f-web); g "$F2" checkout -q -b feat/pay-page; commit "$F2" a; g "$F2" push -q -u origin feat/pay-page; commit "$F2" more
+F3=$(new f-docs)
+before=$(snapshot "$F1")
+out=$(PATH="$T/bin:$PATH" GH_STUB="feat/pay-core:all=#7 OPEN" bash "$GP" feature pay "$F1" "$F2" "$F3")
+has "feature/header" "$out" "3 repo(s) · 3 branch(es)"
+has "feature/pushed with PR" "$out" "| f-api | feat/pay-core | +1 | pushed | #7 OPEN |"
+has "feature/stacked" "$out" "| f-api | feat/pay-ui | +3 | never pushed | - | stacked on feat/pay-core: merge that one first |"
+has "feature/unpushed" "$out" "| f-web | feat/pay-page | +2 | 1 unpushed | none |"
+has "feature/missing" "$out" "No matching branch in: f-docs"
+has "feature/next" "$out" "publish feat/pay-ui: git -C"
+eq  "feature/merge order" "$(printf '%s\n' "$out" | grep '^| f-api' | head -1 | cut -d'|' -f3 | tr -d ' ')" "feat/pay-core"
+eq  "feature/read-only" "$(snapshot "$F1")" "$before"
+out=$(bash "$GP" feature 'feat/pay-u*' --no-fetch "$F1"); has "feature/glob" "$out" "1 branch(es)"
+out=$(bash "$GP" feature 2>&1); eq "feature/needs pattern" "$?" "2"
+
+# 21. cleanup lists, never deletes
+C1=$(new c-one)
+g "$C1" checkout -q -b done-ff; commit "$C1" a; g "$C1" push -q -u origin done-ff
+g "$C1" checkout -q main; g "$C1" merge -q --ff-only done-ff; g "$C1" push -q origin main
+g "$C1" checkout -q -b squashed; commit "$C1" s; g "$C1" push -q -u origin squashed
+g "$C1" checkout -q -b mystery; commit "$C1" m; g "$C1" push -q -u origin mystery
+g "$C1" checkout -q -b wip; commit "$C1" w
+g "$C1" checkout -q main
+g "$T/c-one.git" branch -D squashed mystery >/dev/null
+before=$(snapshot "$C1")
+out=$(PATH="$T/bin:$PATH" GH_STUB="squashed:merged=#12 MERGED" bash "$GP" cleanup "$C1")
+has   "cleanup/merged" "$out" "- c-one (1): git -C"
+has   "cleanup/merged cmd" "$out" "branch -D done-ff"
+has   "cleanup/squashed evidence" "$out" "squashed (PR #12 MERGED)"
+has   "cleanup/unverified" "$out" "- c-one (1): mystery"
+hasnt "cleanup/unverified has no command" "$out" "branch -D mystery"
+hasnt "cleanup/keeps unmerged work" "$out" "wip"
+has   "cleanup/says so" "$out" "nothing was deleted"
+eq    "cleanup/read-only" "$(snapshot "$C1")" "$before"
+out=$(bash "$GP" cleanup "$(new c-empty)"); has "cleanup/nothing" "$out" "Nothing to clean."
+
+# 22. fork: base follows the "upstream" remote
+git init -q --bare -b main "$T/up.git"; git clone -q "$T/up.git" "$T/up-w" 2>/dev/null
+g "$T/up-w" checkout -q -b main 2>/dev/null; commit "$T/up-w" init; g "$T/up-w" push -q -u origin main
+git clone -q --bare "$T/up.git" "$T/fork.git"; git clone -q "$T/fork.git" "$T/fork"
+K="$T/fork"; g "$K" remote add upstream "$T/up.git"; g "$K" remote set-head origin main
+commit "$T/up-w" u1; commit "$T/up-w" u2; g "$T/up-w" push -q origin main
+old=$(sha "$K" main)
+out=$(bash "$GP" status "$K")
+has "fork/status" "$out" "| fork | main | FORK-BEHIND 2 |"
+eq  "fork/status read-only" "$(sha "$K" main)" "$old"
+out=$(bash "$GP" remote "$K")
+has "fork/remote" "$out" "main updated +2 from upstream"
+eq  "fork/remote sha" "$(sha "$K" main)" "$(sha "$K" upstream/main)"
+has "fork/next" "$out" "push origin main"
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]

@@ -56,9 +56,38 @@ branch.
 
 ## Many repositories
 
-Use the `repos` file for the set you always work on. For a one-off, pass paths.
+Use the `repos` file for the set you always work on, with `[group]` sections if
+you have more than one set (`[work]`, `[oss]`). For a one-off, pass paths.
 From a parent folder with no `repos` file, repositories up to two levels below
 are found automatically.
+
+## A feature that spans repositories
+
+```
+/git-parity:feature checkout
+```
+
+One table shows every branch whose name contains `checkout`, in every repository:
+how far ahead of the base it is, whether it is pushed, its pull request, and
+which branch must be merged first when branches are stacked. Use it before a
+release to see what is still missing.
+
+## Housekeeping
+
+```
+/git-parity:cleanup
+```
+
+Lists local branches whose work is already in the base, and asks before deleting
+anything. Squash-merged branches are only offered when a merged pull request is
+found (needs `gh`); otherwise they are listed as "not verified" with no delete
+command.
+
+## Forks
+
+Add the original repository as a remote named `upstream`. From then on
+`/git-parity:remote` keeps your local base equal to `upstream`, and the report
+reminds you to push it to your fork.
 
 ## When something is skipped
 
