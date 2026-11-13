@@ -17,7 +17,7 @@ If no report appears above, run `bash "${CLAUDE_SKILL_DIR}/../../scripts/git-par
 ## What to do
 
 1. Show the report as is. Translate prose to the user's language; keep names, states and commands verbatim.
-2. If there is a "Push candidates" section, ask which ones to push. One decision per repository/branch; "all" is acceptable only if the user says so explicitly.
+2. If there is a "Push candidates" section, ask which ones to push. One decision per repository/branch; "all" is acceptable only if the user says so explicitly. When asking with a choice widget, every question needs at least two options: for a repository with a single candidate, offer "push" and "skip".
 3. For each approved candidate, run exactly the command printed for it. Never add `--force`, `--force-with-lease` or `--no-verify`.
 4. After a successful push of a non-base branch, offer a pull request. If the user agrees: `gh pr create --fill` in that repo when `gh` is installed, otherwise print the compare URL from the push output. Ask for title/body changes before creating.
 5. End with a short list: pushed, PR opened (with URL), skipped.
