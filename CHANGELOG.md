@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-11-13
+
+### Added
+
+- `/git-parity:prs`: your open pull requests with CI, review and conflict state,
+  ordered by urgency, plus the ones waiting for your review.
+- `/git-parity:whats-new`: commits that came into the base branch, the areas they
+  touch, and the files also changed on your current branch.
+- GitLab: merge requests through `glab` in `prs`, `feature`, `cleanup`, `local`
+  and `full`. `GIT_PARITY_FORGE=github|gitlab` overrides host detection for
+  self-hosted servers.
+- Optional session-start hook: one line when repositories need attention. Off by
+  default; enable with `session_hook=on` in `~/.config/git-parity/config`.
+
 ## [1.1.0] - 2026-11-13
 
 ### Added

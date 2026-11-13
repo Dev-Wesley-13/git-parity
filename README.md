@@ -67,6 +67,8 @@ Requirements: git 2.23+, bash 3.2+ (Linux, macOS, WSL, Git Bash).
 | `/git-parity:full` | `remote`, then `local`. | Both, same rules. |
 | `/git-parity:feature <name>` | Where the branches of one feature stand in every repository: ahead of base, pushed, pull request, merge order. | Nothing. |
 | `/git-parity:cleanup` | Lists merged branches and stale worktree records, deletes what you approve. | Local branches, after you confirm. |
+| `/git-parity:prs` | Your open pull requests with CI, review and conflict state, plus the ones waiting for your review. | Nothing. |
+| `/git-parity:whats-new` | What came into the base branch, and which of those files you also changed. | Nothing. |
 
 Every command accepts repository paths or group names:
 `/git-parity:status ~/code/api ~/code/web`, `/git-parity:remote work`.
@@ -119,6 +121,31 @@ If a repository has a remote named `upstream`, the base branch follows it:
 `remote` fast-forwards your local base from `upstream`, and the report shows
 `FORK-BEHIND n` until you push the base to your fork.
 
+## GitHub and GitLab
+
+Everything that is plain git works with any host. Pull request features use the
+host's own CLI, picked from the `origin` URL:
+
+| Host | CLI | Used by |
+|---|---|---|
+| GitHub | [`gh`](https://cli.github.com) | `prs`, `feature`, `cleanup`, pull request creation |
+| GitLab | [`glab`](https://docs.gitlab.com/cli/) | the same, with merge requests |
+
+Without the CLI those parts are skipped and the report says so. For a
+self-hosted server whose URL contains neither name, set
+`GIT_PARITY_FORGE=github` or `GIT_PARITY_FORGE=gitlab`.
+
+## A reminder when you open a session (optional)
+
+```
+echo "session_hook=on" >> ~/.config/git-parity/config
+```
+
+With this, opening Claude Code prints one line when something needs you:
+`git-parity: 2 of 5 repositories need attention.` It prints nothing when all is
+clean, never changes anything, and gives each fetch 5 seconds. It is off by
+default because it adds a fetch to every session start.
+
 ## Protected branches
 
 The base branch (`origin/HEAD`, else `main`, else `master`) is never offered for
@@ -166,8 +193,10 @@ for any behavior change.
 ## FAQ
 
 **Does it work with GitLab, Bitbucket or a self-hosted server?**
-Yes for `status`, `remote`, `cleanup` and pushes: those are plain git. Pull
-request lookup and creation use `gh`, so they are GitHub only for now.
+Yes for `status`, `remote`, `whats-new` and pushes: those are plain git, on any
+host. Pull and merge request features work on GitHub (`gh`) and GitLab (`glab`).
+GitLab support is tested against a simulated `glab`; please open an issue if a
+real server behaves differently.
 
 **Why did it skip a repository?**
 Because acting was not provably safe: uncommitted changes, diverged history, an

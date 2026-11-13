@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # git-parity: report (and safely fast-forward) the state of many git repositories.
 #
-# Usage: git-parity.sh <status|remote|local|full|cleanup> [--no-fetch] [repo-path|group ...]
+# Usage: git-parity.sh <status|remote|local|full|cleanup|prs|whats-new> [--no-fetch] [repo-path|group ...]
 #        git-parity.sh feature <branch-pattern> [--no-fetch] [repo-path|group ...]
+#        git-parity.sh hook
 #
 #   status   read-only report (only runs `git fetch`)
 #   remote   status + fast-forward local branches that are strictly behind
@@ -10,6 +11,9 @@
 #   full     remote + local
 #   feature  where the branches of one feature stand in every repository
 #   cleanup  list branches and worktrees that are safe to delete (deletes nothing)
+#   prs      my open pull/merge requests and the ones waiting for my review
+#   whats-new  commits that came into the base branch, and what they touch on my branch
+#   hook     one line for a session-start hook; silent unless session_hook=on in the config file
 #
 # Never pushes, forces, resets, stashes, commits, deletes or checks out anything.
 # Bash 3.2 compatible (macOS): no associative arrays, no mapfile.
@@ -22,6 +26,7 @@ CONFIG_DIR="${GIT_PARITY_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/git-parit
 FETCH_TIMEOUT="${GIT_PARITY_FETCH_TIMEOUT:-30}"
 JOBS="${GIT_PARITY_JOBS:-8}"
 MAX_BRANCH_LINES=8
+MAX_NEWS=12
 SEP=$'\037'   # unit separator: never appears in branch names or paths
 
 die() { echo "git-parity: $*" >&2; exit 2; }
@@ -368,10 +373,27 @@ clip_detail() { # keep at most MAX_BRANCH_LINES "; " separated items
 # --- feature: where do the branches of one feature stand ---------------------------
 # Records: F <name> <order> <branch> <vs base> <remote> <pr> <note> | X <name> | N <name> <text>
 
-pr_lookup() { # repo branch state-filter -> "#12 OPEN" (empty when gh is missing or nothing found)
-  command -v gh >/dev/null 2>&1 || return 0
-  (cd "$1" && gh pr list --head "$2" --state "$3" --limit 1 --json number,state,isDraft \
-     -q '.[0] | select(.) | "#\(.number) \(if .isDraft then "DRAFT" else .state end)"' 2>/dev/null)
+forge() { # repo -> github | gitlab | other, from the origin URL (GIT_PARITY_FORGE overrides, e.g. for self-hosted servers)
+  if [ -n "${GIT_PARITY_FORGE:-}" ]; then echo "$GIT_PARITY_FORGE"; return; fi
+  case $(git -C "$1" remote get-url origin 2>/dev/null) in
+    *github.com*) echo github ;;
+    *gitlab*) echo gitlab ;;
+    *) echo other ;;
+  esac
+}
+
+pr_lookup() { # repo branch <all|merged> -> "#12 OPEN" / "!12 merged" (empty when the CLI is missing or nothing is found)
+  case $(forge "$1") in
+    github)
+      command -v gh >/dev/null 2>&1 || return 0
+      (cd "$1" && gh pr list --head "$2" --state "$3" --limit 1 --json number,state,isDraft \
+         -q '.[0] | select(.) | "#\(.number) \(if .isDraft then "DRAFT" else .state end)"' 2>/dev/null) ;;
+    gitlab)
+      command -v glab >/dev/null 2>&1 || return 0
+      local flag=--all; [ "$3" = merged ] && flag=--merged
+      (cd "$1" && glab mr list --source-branch "$2" "$flag" -F json \
+         --jq '.[0] | select(.) | "!\(.iid) \(.state)"' 2>/dev/null) ;;
+  esac
 }
 
 branch_ref() { # repo branch -> local ref if it exists, else the remote-tracking ref
@@ -430,7 +452,7 @@ feature_worker() {
     if [ -n "$has_remote" ]; then
       pr=$(pr_lookup "$repo" "$b" all); [ -n "$pr" ] || pr="none"
       if [ "$pr" = "none" ] && [ "$ahead" != 0 ] && [ "$remote" = "pushed" ]; then
-        printf 'N%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$ahead" "$SEP" "open a PR for $b: (cd $q && gh pr create --head $b --fill)"
+        printf 'N%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$ahead" "$SEP" "open a pull/merge request for $b"
       fi
     fi
 
@@ -538,14 +560,203 @@ render_cleanup() {
   echo "Ask before deleting. Run only the commands the user approves."
 }
 
+# --- prs: my open pull requests and the ones waiting for my review -----------------
+# Records: M <name> <rank> <id> <branch> <ci> <review> <merge> <title> | V <name> <id> <author> <title>
+#          S <name> <reason> | N <name> <rank> <text>
+
+# jq program run by `gh pr list -q`: one line per pull request, fields separated by \037
+# shellcheck disable=SC2016
+PRS_JQ='.[]
+| ([.statusCheckRollup[]? | (.conclusion // .state // .status // "PENDING")]) as $c
+| (if ($c | length) == 0 then "none"
+   elif ($c | map(select(. == "FAILURE" or . == "ERROR" or . == "TIMED_OUT" or . == "CANCELLED" or . == "ACTION_REQUIRED")) | length) > 0 then "failing"
+   elif ($c | map(select(. == "PENDING" or . == "IN_PROGRESS" or . == "QUEUED" or . == "EXPECTED" or . == "WAITING")) | length) > 0 then "running"
+   else "passing" end) as $ci
+| (if .isDraft then "draft"
+   elif .reviewDecision == "APPROVED" then "approved"
+   elif .reviewDecision == "CHANGES_REQUESTED" then "changes requested"
+   elif .reviewDecision == "REVIEW_REQUIRED" then "review pending"
+   else "no review" end) as $rv
+| (if .mergeable == "CONFLICTING" then "conflict" elif .mergeable == "MERGEABLE" then "ok" else "?" end) as $mg
+| (if $ci == "failing" or $mg == "conflict" or $rv == "changes requested" then 0
+   elif $rv == "approved" and $ci != "running" then 1
+   elif $ci == "running" then 2
+   else 3 end) as $rank
+| [$rank, "#\(.number)", .headRefName, $ci, $rv, $mg, .title] | map(tostring) | join("\u001f")'
+
+# shellcheck disable=SC2016
+MRS_JQ='.[]
+| [(if .has_conflicts then 0 else 3 end), "!\(.iid)", .source_branch, "-",
+   (if .draft then "draft" else "-" end), (if .has_conflicts then "conflict" else "ok" end), .title]
+| map(tostring) | join("\u001f")'
+
+prs_worker() {
+  local repo=$1 name q host rank id branch ci review merge title author why
+  name=$(basename "$repo"); q=$(qpath "$repo")
+  git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || return 0
+  host=$(forge "$repo")
+  case $host in
+    github)
+      command -v gh >/dev/null 2>&1 || { printf 'S%s%s%sgh is not installed\n' "$SEP" "$name" "$SEP"; return 0; }
+      (cd "$repo" && gh pr list --author @me --state open --limit 30 \
+          --json number,title,headRefName,isDraft,reviewDecision,mergeable,statusCheckRollup -q "$PRS_JQ" 2>/dev/null) > "$TMPW.mine"
+      (cd "$repo" && gh pr list --search "review-requested:@me" --state open --limit 30 \
+          --json number,title,author -q '.[] | ["#\(.number)", .author.login, .title] | join("\u001f")' 2>/dev/null) > "$TMPW.rev" ;;
+    gitlab)
+      command -v glab >/dev/null 2>&1 || { printf 'S%s%s%sglab is not installed\n' "$SEP" "$name" "$SEP"; return 0; }
+      (cd "$repo" && glab mr list --author=@me -F json --jq "$MRS_JQ" 2>/dev/null) > "$TMPW.mine"
+      (cd "$repo" && glab mr list --reviewer=@me -F json \
+          --jq '.[] | ["!\(.iid)", .author.username, .title] | join("\u001f")' 2>/dev/null) > "$TMPW.rev" ;;
+    *) printf 'S%s%s%snot a GitHub or GitLab remote\n' "$SEP" "$name" "$SEP"; return 0 ;;
+  esac
+  while IFS="$SEP" read -r rank id branch ci review merge title; do
+    [ -n "$id" ] || continue
+    printf 'M%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$rank" "$SEP" "$id" "$SEP" "$branch" "$SEP" "$ci" "$SEP" "$review" "$SEP" "$merge" "$SEP" "$(printf '%s' "$title" | cut -c1-60)"
+    why=""
+    [ "$ci" = "failing" ] && why="checks failing"
+    [ "$merge" = "conflict" ] && why="${why:+$why, }conflicts with the base"
+    [ "$review" = "changes requested" ] && why="${why:+$why, }changes requested"
+    if [ -n "$why" ]; then
+      printf 'N%s%s%s0%s%s\n' "$SEP" "$name" "$SEP" "$SEP" "$id ($branch): $why"
+    elif [ "$rank" = 1 ]; then
+      printf 'N%s%s%s1%s%s\n' "$SEP" "$name" "$SEP" "$SEP" "$id ($branch): approved, ready to merge"
+    fi
+  done < "$TMPW.mine"
+  while IFS="$SEP" read -r id author title; do
+    [ -n "$id" ] || continue
+    printf 'V%s%s%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$id" "$SEP" "$author" "$SEP" "$(printf '%s' "$title" | cut -c1-60)"
+  done < "$TMPW.rev"
+  rm -f "$TMPW.mine" "$TMPW.rev"
+  return 0
+}
+
+render_prs() {
+  local tmp=$1 total=$2
+  echo "git-parity prs · $total repo(s) · $(grep -c "^M$SEP" "$tmp") open · $(grep -c "^M${SEP}[^${SEP}]*${SEP}0${SEP}" "$tmp") need action · $(grep -c "^V$SEP" "$tmp") waiting for your review"
+  echo
+  if grep -q "^M$SEP" "$tmp"; then
+    echo "My open pull requests"
+    echo "| Repo | PR | Branch | CI | Review | Merge | Title |"
+    echo "|---|---|---|---|---|---|---|"
+    grep "^M$SEP" "$tmp" | sort -t "$SEP" -k3,3n -k2,2 | while IFS="$SEP" read -r _ name _ id branch ci review merge title; do
+      echo "| $name | $id | $branch | $ci | $review | $merge | $title |"
+    done
+    echo
+  fi
+  if grep -q "^V$SEP" "$tmp"; then
+    echo "Waiting for my review"
+    grep "^V$SEP" "$tmp" | sort -t "$SEP" -k2,2 | while IFS="$SEP" read -r _ name id author title; do
+      echo "- $name · $id · $author · $title"
+    done
+    echo
+  fi
+  if grep -q "^S$SEP" "$tmp"; then
+    echo "Skipped"
+    grep "^S$SEP" "$tmp" | sort -t "$SEP" -k2,2 | while IFS="$SEP" read -r _ name reason; do echo "- $name: $reason"; done
+    echo
+  fi
+  if grep -q "^N$SEP" "$tmp"; then
+    echo "Next steps"
+    grep "^N$SEP" "$tmp" | sort -t "$SEP" -k3,3n -k2,2 | while IFS="$SEP" read -r _ n _ text; do echo "- $n $text"; done
+  elif ! grep -q "^[MV]$SEP" "$tmp"; then
+    echo "No open pull requests and nothing waiting for your review."
+  else
+    echo "Nothing needs you right now."
+  fi
+}
+
+# --- whats-new: what came into the base branch -------------------------------------
+# Records: H <name> <base> <count> <label> | L <name> <seq> <line> | A <name> <areas> | O <name> <branch> <files> | X <name>
+
+whats_new_worker() {
+  local do_fetch=$1 repo=$2 name base branch range label count prev when overlap n
+  name=$(basename "$repo")
+  git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || return 0
+  [ "$do_fetch" = 1 ] && [ -n "$(git -C "$repo" remote)" ] && run_fetch "$repo"
+  base=$(detect_base "$repo")
+  if [ -z "$base" ] || ! git -C "$repo" show-ref --verify --quiet "refs/heads/$base"; then printf 'X%s%s\n' "$SEP" "$name"; return 0; fi
+  branch=$(git -C "$repo" symbolic-ref --quiet --short HEAD 2>/dev/null)
+
+  if [ "$(git -C "$repo" rev-list --count "refs/heads/$base..refs/remotes/origin/$base" 2>/dev/null || echo 0)" -gt 0 ]; then
+    range="refs/heads/$base..refs/remotes/origin/$base"; label="incoming, not pulled yet"
+  else
+    prev=$(git -C "$repo" rev-parse --quiet --verify "$base@{1}" 2>/dev/null)
+    if [ -z "$prev" ] || ! git -C "$repo" merge-base --is-ancestor "$prev" "refs/heads/$base" 2>/dev/null; then
+      printf 'X%s%s\n' "$SEP" "$name"; return 0
+    fi
+    when=$(git -C "$repo" reflog show -1 --date=relative --format='%gd' "refs/heads/$base" 2>/dev/null | sed 's/.*{\(.*\)}/\1/')
+    range="$prev..refs/heads/$base"; label="since the last update${when:+ ($when)}"
+  fi
+  count=$(git -C "$repo" rev-list --count --no-merges "$range" 2>/dev/null || echo 0)
+  [ "$count" -gt 0 ] || { printf 'X%s%s\n' "$SEP" "$name"; return 0; }
+  printf 'H%s%s%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$base" "$SEP" "$count" "$SEP" "$label"
+
+  n=0
+  while IFS= read -r line; do
+    n=$((n + 1))
+    printf 'L%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$n" "$SEP" "$line"
+  done < <(git -C "$repo" log --no-merges -n "$MAX_NEWS" --format='%h %s (%an, %cr)' "$range" 2>/dev/null)
+
+  printf 'A%s%s%s%s\n' "$SEP" "$name" "$SEP" "$(git -C "$repo" diff --name-only "$range" 2>/dev/null \
+      | awk -F/ '{ d = (NF > 2 ? $1 "/" $2 : (NF > 1 ? $1 : ".")); c[d]++ } END { for (d in c) printf "%d %s\n", c[d], d }' \
+      | sort -rn | head -5 | awk '{ printf "%s%s (%s)", (NR > 1 ? ", " : ""), $2, $1 }')"
+
+  if [ -n "$branch" ] && [ "$branch" != "$base" ]; then
+    overlap=$(comm -12 <(git -C "$repo" diff --name-only "$range" 2>/dev/null | sort) \
+                       <(git -C "$repo" diff --name-only "refs/heads/$base...HEAD" 2>/dev/null | sort))
+    if [ -n "$overlap" ]; then
+      n=$(printf '%s\n' "$overlap" | grep -c .)
+      printf 'O%s%s%s%s%s%s\n' "$SEP" "$name" "$SEP" "$branch" "$SEP" "$(printf '%s\n' "$overlap" | head -6 | tr '\n' ',' | sed 's/,$//; s/,/, /g')$( [ "$n" -gt 6 ] && echo " (+$((n - 6)) more)")"
+    fi
+  fi
+  return 0
+}
+
+render_whats_new() {
+  local tmp=$1 total=$2 name base count label
+  echo "git-parity whats-new · $total repo(s) · $(grep -c "^H$SEP" "$tmp") with news"
+  echo
+  grep "^H$SEP" "$tmp" | sort -t "$SEP" -k2,2 | while IFS="$SEP" read -r _ name base count label; do
+    echo "$name · $base · $count new commit(s) · $label"
+    grep "^L$SEP$name$SEP" "$tmp" | sort -t "$SEP" -k3,3n | cut -d "$SEP" -f4 | sed 's/^/  /'
+    [ "$count" -gt "$MAX_NEWS" ] && echo "  +$((count - MAX_NEWS)) more"
+    grep "^A$SEP$name$SEP" "$tmp" | cut -d "$SEP" -f3 | sed 's/^/  Areas: /'
+    grep "^O$SEP$name$SEP" "$tmp" | while IFS="$SEP" read -r _ _ branch files; do
+      echo "  Also changed on your branch $branch (possible conflicts): $files"
+    done
+    echo
+  done
+  local quiet; quiet=$(grep "^X$SEP" "$tmp" | cut -d "$SEP" -f2 | sort | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+  [ -z "$quiet" ] || echo "Nothing new in: $quiet"
+}
+
+# --- hook: one line at session start, only when opted in and something needs attention
+run_hook() {
+  [ -f "$CONFIG_DIR/config" ] && grep -qx 'session_hook=on' "$CONFIG_DIR/config" || return 0
+  local repos tmp n total
+  if [ -n "$(repos_file)" ]; then repos=$(repos_file); else repos=$(git rev-parse --show-toplevel 2>/dev/null); fi
+  [ -n "$repos" ] || return 0
+  tmp=$(mktemp "${TMPDIR:-/tmp}/git-parity.XXXXXX") || return 0
+  FETCH_TIMEOUT=5; export GIT_PARITY_FETCH_TIMEOUT=5
+  printf '%s\n' "$repos" | tr '\n' '\0' | xargs -0 -n 1 -P "$JOBS" bash "$0" --worker status 1 > "$tmp" 2>/dev/null
+  n=$(grep -c "^R${SEP}[0-8]${SEP}" "$tmp"); total=$(printf '%s\n' "$repos" | grep -c .)
+  rm -f "$tmp"
+  [ "$n" -gt 0 ] && echo "git-parity: $n of $total repositories need attention. Run /git-parity:status for details."
+  return 0
+}
+
 # --- main ---------------------------------------------------------------------
 if [ "${1:-}" = "--worker" ]; then shift; worker "$@"; exit 0; fi
 if [ "${1:-}" = "--feature-worker" ]; then shift; feature_worker "$@"; exit 0; fi
 if [ "${1:-}" = "--cleanup-worker" ]; then shift; cleanup_worker "$@"; exit 0; fi
+if [ "${1:-}" = "--prs-worker" ]; then shift; TMPW=$(mktemp "${TMPDIR:-/tmp}/git-parity.XXXXXX"); prs_worker "$@"; rm -f "$TMPW" "$TMPW".*; exit 0; fi
+if [ "${1:-}" = "--news-worker" ]; then shift; whats_new_worker "$@"; exit 0; fi
+if [ "${1:-}" = "--print-prs-jq" ]; then printf '%s\n' "$PRS_JQ"; exit 0; fi
+if [ "${1:-}" = "hook" ]; then run_hook; exit 0; fi
 
 MODE=${1:-status}; [ "$#" -gt 0 ] && shift
-case $MODE in status|remote|local|full|feature|cleanup) ;; -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-  *) die "unknown mode '$MODE' (use: status, remote, local, full, feature, cleanup)" ;; esac
+case $MODE in status|remote|local|full|feature|cleanup|prs|whats-new) ;; -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  *) die "unknown mode '$MODE' (use: status, remote, local, full, feature, cleanup, prs, whats-new)" ;; esac
 
 PATTERN=""
 if [ "$MODE" = feature ]; then
@@ -579,6 +790,12 @@ case $MODE in
   cleanup)
     tr '\n' '\0' < "$TMP.repos" | xargs -0 -n 1 -P "$JOBS" bash "$0" --cleanup-worker "$DO_FETCH" > "$TMP"
     render_cleanup "$TMP" "$TOTAL" ;;
+  prs)
+    tr '\n' '\0' < "$TMP.repos" | xargs -0 -n 1 -P "$JOBS" bash "$0" --prs-worker > "$TMP"
+    render_prs "$TMP" "$TOTAL" ;;
+  whats-new)
+    tr '\n' '\0' < "$TMP.repos" | xargs -0 -n 1 -P "$JOBS" bash "$0" --news-worker "$DO_FETCH" > "$TMP"
+    render_whats_new "$TMP" "$TOTAL" ;;
   *)
     tr '\n' '\0' < "$TMP.repos" | xargs -0 -n 1 -P "$JOBS" bash "$0" --worker "$MODE" "$DO_FETCH" > "$TMP"
     END=$(date +%s)

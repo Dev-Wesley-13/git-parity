@@ -66,6 +66,8 @@ Requisitos: git 2.23+, bash 3.2+ (Linux, macOS, WSL, Git Bash).
 | `/git-parity:full` | `remote`, depois `local`. | Ambos, mesmas regras. |
 | `/git-parity:feature <nome>` | Onde estão as branches de uma feature em cada repositório: à frente da base, enviada, pull request, ordem de merge. | Nada. |
 | `/git-parity:cleanup` | Lista branches já mergeadas e registros de worktree obsoletos, apaga o que você aprovar. | Branches locais, após você confirmar. |
+| `/git-parity:prs` | Seus pull requests abertos com estado de CI, review e conflito, mais os que aguardam seu review. | Nada. |
+| `/git-parity:whats-new` | O que entrou na branch base e quais desses arquivos você também alterou. | Nada. |
 
 Todo comando aceita caminhos ou nomes de grupo:
 `/git-parity:status ~/code/api ~/code/web`, `/git-parity:remote trabalho`.
@@ -94,6 +96,23 @@ caminhos são usados; `/git-parity:status trabalho` verifica só aquele grupo.
 Se o repositório tem um remoto chamado `upstream`, a base segue ele: `remote`
 faz fast-forward da base local a partir do `upstream`, e o relatório mostra
 `FORK-BEHIND n` até você enviar a base para o seu fork.
+
+## GitHub e GitLab
+
+O que é git puro funciona em qualquer host. Recursos de pull request usam a CLI
+do host, escolhida pela URL do `origin`: `gh` no GitHub, `glab` no GitLab (merge
+requests). Sem a CLI, essas partes são puladas e o relatório avisa. Para servidor
+próprio, defina `GIT_PARITY_FORGE=github` ou `GIT_PARITY_FORGE=gitlab`.
+
+## Lembrete ao abrir a sessão (opcional)
+
+```
+echo "session_hook=on" >> ~/.config/git-parity/config
+```
+
+Com isso, ao abrir o Claude Code aparece uma linha quando algo precisa de você.
+Não imprime nada se tudo está limpo e nunca altera nada. Vem desligado porque
+adiciona um fetch a cada início de sessão.
 
 ## Branches protegidas
 

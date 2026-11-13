@@ -245,7 +245,7 @@ cat > "$T/bin/gh" <<'STUB'
 #!/usr/bin/env bash
 head=""; state=""
 while [ "$#" -gt 0 ]; do
-  case $1 in --head) head=$2; shift ;; --state) state=$2; shift ;; esac
+  case $1 in --head) head=$2; shift ;; --state) state=$2; shift ;; --author) head=mine; shift ;; --search) head=reviews; shift ;; esac
   shift
 done
 printf '%s\n' "${GH_STUB:-}" | tr ';' '\n' | while IFS='=' read -r key text; do
@@ -261,7 +261,7 @@ g "$F1" checkout -q -b feat/pay-ui; commit "$F1" b; commit "$F1" c
 F2=$(new f-web); g "$F2" checkout -q -b feat/pay-page; commit "$F2" a; g "$F2" push -q -u origin feat/pay-page; commit "$F2" more
 F3=$(new f-docs)
 before=$(snapshot "$F1")
-out=$(PATH="$T/bin:$PATH" GH_STUB="feat/pay-core:all=#7 OPEN" bash "$GP" feature pay "$F1" "$F2" "$F3")
+out=$(PATH="$T/bin:$PATH" GIT_PARITY_FORGE=github GH_STUB="feat/pay-core:all=#7 OPEN" bash "$GP" feature pay "$F1" "$F2" "$F3")
 has "feature/header" "$out" "3 repo(s) · 3 branch(es)"
 has "feature/pushed with PR" "$out" "| f-api | feat/pay-core | +1 | pushed | #7 OPEN |"
 has "feature/stacked" "$out" "| f-api | feat/pay-ui | +3 | never pushed | - | stacked on feat/pay-core: merge that one first |"
@@ -283,7 +283,7 @@ g "$C1" checkout -q -b wip; commit "$C1" w
 g "$C1" checkout -q main
 g "$T/c-one.git" branch -D squashed mystery >/dev/null
 before=$(snapshot "$C1")
-out=$(PATH="$T/bin:$PATH" GH_STUB="squashed:merged=#12 MERGED" bash "$GP" cleanup "$C1")
+out=$(PATH="$T/bin:$PATH" GIT_PARITY_FORGE=github GH_STUB="squashed:merged=#12 MERGED" bash "$GP" cleanup "$C1")
 has   "cleanup/merged" "$out" "- c-one (1): git -C"
 has   "cleanup/merged cmd" "$out" "branch -D done-ff"
 has   "cleanup/squashed evidence" "$out" "squashed (PR #12 MERGED)"
@@ -308,6 +308,91 @@ out=$(bash "$GP" remote "$K")
 has "fork/remote" "$out" "main updated +2 from upstream"
 eq  "fork/remote sha" "$(sha "$K" main)" "$(sha "$K" upstream/main)"
 has "fork/next" "$out" "push origin main"
+
+# --- 1.2.0: prs, whats-new, GitLab, session hook ------------------------------
+
+US=$(printf '\037')
+
+# glab stub, same idea as the gh stub: GLAB_STUB="key=text;key=text"
+cat > "$T/bin/glab" <<'STUB'
+#!/usr/bin/env bash
+key=""; state=all
+for a in "$@"; do
+  case $a in --author=@me) key=mine ;; --reviewer=@me) key=reviews ;; --merged) state=merged ;; esac
+done
+while [ "$#" -gt 0 ]; do
+  case $1 in --source-branch) key=$2; shift ;; esac
+  shift
+done
+printf '%s\n' "${GLAB_STUB:-}" | tr ';' '\n' | while IFS='=' read -r k text; do
+  [ "$k" = "$key:$state" ] && echo "$text"
+done
+exit 0
+STUB
+chmod +x "$T/bin/glab"
+
+# 23. prs: table, ordering by urgency, review queue, next steps
+P1=$(new p-api); P2=$(new p-web)
+mine="3${US}#11${US}feat/a${US}passing${US}review pending${US}ok${US}Add A"
+bad="0${US}#12${US}feat/b${US}failing${US}changes requested${US}conflict${US}Fix B"
+ready="1${US}#13${US}feat/c${US}passing${US}approved${US}ok${US}Ship C"
+rev="#20${US}ana${US}Please review"
+out=$(PATH="$T/bin:$PATH" GIT_PARITY_FORGE=github GH_STUB="mine:open=$mine;mine:open=$bad;mine:open=$ready;reviews:open=$rev" bash "$GP" prs "$P1")
+has "prs/header" "$out" "3 open · 1 need action · 1 waiting for your review"
+has "prs/row" "$out" "| p-api | #11 | feat/a | passing | review pending | ok | Add A |"
+eq  "prs/urgent first" "$(printf '%s\n' "$out" | grep '^| p-api' | head -1 | cut -d'|' -f3 | tr -d ' ')" "#12"
+has "prs/review queue" "$out" "- p-api · #20 · ana · Please review"
+has "prs/next action" "$out" "#12 (feat/b): checks failing, conflicts with the base, changes requested"
+has "prs/next ready" "$out" "#13 (feat/c): approved, ready to merge"
+out=$(PATH="$T/bin:$PATH" GIT_PARITY_FORGE=github GH_STUB="" bash "$GP" prs "$P1" "$P2")
+has "prs/empty" "$out" "No open pull requests"
+out=$(bash "$GP" prs "$P1"); has "prs/unknown host skipped" "$out" "p-api: not a GitHub or GitLab remote"
+if command -v jq >/dev/null 2>&1; then
+  fixture='[{"number":5,"title":"T","headRefName":"f","isDraft":false,"reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"SUCCESS"}]},{"number":6,"title":"U","headRefName":"g","isDraft":false,"reviewDecision":"","mergeable":"CONFLICTING","statusCheckRollup":[{"conclusion":"FAILURE"}]},{"number":7,"title":"V","headRefName":"h","isDraft":true,"reviewDecision":null,"mergeable":"UNKNOWN","statusCheckRollup":[{"status":"IN_PROGRESS","conclusion":null}]},{"number":8,"title":"W","headRefName":"i","isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"MERGEABLE","statusCheckRollup":[]}]'
+  got=$(printf '%s' "$fixture" | jq -r "$(bash "$GP" --print-prs-jq)" | tr '\037' '|')
+  has "prs/jq approved" "$got" "1|#5|f|passing|approved|ok|T"
+  has "prs/jq failing" "$got" "0|#6|g|failing|no review|conflict|U"
+  has "prs/jq running draft" "$got" "2|#7|h|running|draft|?|V"
+  has "prs/jq no checks" "$got" "3|#8|i|none|review pending|ok|W"
+fi
+
+# 24. GitLab: merge requests through glab
+out=$(PATH="$T/bin:$PATH" GIT_PARITY_FORGE=gitlab GLAB_STUB="mine:all=3${US}!4${US}feat/a${US}-${US}-${US}ok${US}MR A;reviews:all=!9${US}bob${US}Look" bash "$GP" prs "$P1")
+has "gitlab/prs" "$out" "| p-api | !4 | feat/a | - | - | ok | MR A |"
+has "gitlab/reviews" "$out" "- p-api · !9 · bob · Look"
+L1=$(new l-api); g "$L1" checkout -q -b feat/x; commit "$L1" a; g "$L1" push -q -u origin feat/x
+out=$(PATH="$T/bin:$PATH" GIT_PARITY_FORGE=gitlab GLAB_STUB="feat/x:all=!7 opened" bash "$GP" feature x "$L1")
+has "gitlab/feature" "$out" "| l-api | feat/x | +1 | pushed | !7 opened |"
+out=$(GIT_PARITY_FORGE=gitlab PATH="$(dirname "$(command -v git)"):/usr/bin:/bin" bash "$GP" prs "$P1")
+has "gitlab/no glab" "$out" "glab is not installed"
+
+# 25. whats-new: incoming commits, then the last update, with overlap on my branch
+W1=$(new w-api); commit "$W1" base shared.txt; g "$W1" push -q origin main
+g "$W1" checkout -q -b feat/mine; commit "$W1" mine shared.txt
+remote_commit w-api main 2 shared.txt
+before=$(snapshot "$W1")
+out=$(bash "$GP" whats-new "$W1")
+has "news/incoming" "$out" "w-api · main · 2 new commit(s) · incoming, not pulled yet"
+has "news/commit line" "$out" "remote 1 (t,"
+has "news/overlap" "$out" "Also changed on your branch feat/mine (possible conflicts): shared.txt"
+eq  "news/read-only" "$(snapshot "$W1")" "$before"
+bash "$GP" remote "$W1" >/dev/null
+out=$(bash "$GP" whats-new --no-fetch "$W1")
+has "news/after sync" "$out" "2 new commit(s) · since the last update"
+has "news/areas" "$out" "Areas: . (1)"
+out=$(bash "$GP" whats-new --no-fetch "$(new w-quiet)")
+has "news/quiet" "$out" "Nothing new in: w-quiet"
+
+# 26. session hook: silent unless opted in, one line when something needs attention
+H1=$(new h-ok); H2=$(new h-dirty); echo x >> "$H2/file.txt"
+printf '%s\n%s\n' "$H1" "$H2" > "$GIT_PARITY_CONFIG_DIR/repos"
+eq  "hook/off by default" "$(bash "$GP" hook)" ""
+echo "session_hook=on" > "$GIT_PARITY_CONFIG_DIR/config"
+has "hook/on" "$(bash "$GP" hook)" "git-parity: 1 of 2 repositories need attention."
+before=$(snapshot "$H2"); bash "$GP" hook >/dev/null; eq "hook/read-only" "$(snapshot "$H2")" "$before"
+printf '%s\n' "$H1" > "$GIT_PARITY_CONFIG_DIR/repos"
+eq  "hook/silent when clean" "$(bash "$GP" hook)" ""
+rm "$GIT_PARITY_CONFIG_DIR/repos" "$GIT_PARITY_CONFIG_DIR/config"
 
 echo
 echo "passed: $PASS  failed: $FAIL"

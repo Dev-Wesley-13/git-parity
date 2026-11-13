@@ -18,7 +18,7 @@ If no report appears above, run `bash "${CLAUDE_SKILL_DIR}/../../scripts/git-par
 
 1. Show the report as is. Translate prose to the user's language; keep names, states and commands verbatim. Open with one or two sentences: updated, needs attention, ready to push.
 2. Incoming side: for DIVERGED rows explain both sides and offer options; run nothing without an explicit yes.
-3. Outgoing side: if there is a "Push candidates" section, ask which to push (one decision per repo/branch; with a choice widget every question needs at least two options, so offer "push" and "skip" for a single candidate), run exactly the printed command, then offer a pull request (`gh pr create --fill` when `gh` is installed, otherwise the compare URL).
+3. Outgoing side: if there is a "Push candidates" section, ask which to push (one decision per repo/branch; with a choice widget every question needs at least two options, so offer "push" and "skip" for a single candidate), run exactly the printed command, then offer a pull request (`gh pr create --fill` for GitHub, `glab mr create --fill` for GitLab, when that CLI is installed; otherwise the URL that `git push` showed).
 4. End with: updated, pushed, PRs opened, left as is and why.
 
 The goal is that every branch ends in a known, explained state. A branch waiting for review stays ahead of the base on purpose; that is not a problem to fix.

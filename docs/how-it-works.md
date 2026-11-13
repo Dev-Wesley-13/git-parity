@@ -68,6 +68,19 @@ capped per repository.
   protected names and branches checked out in a worktree are never listed.
   The script only prints commands; deleting is done by the skill after you approve.
 
+## prs, whats-new and the hook
+
+- **prs** runs one `gh pr list` (or `glab mr list`) per repository for your open
+  requests and one for review requests. A jq program inside the script reduces
+  each to CI, review and merge state and an urgency rank.
+- **whats-new** needs no stored state. If the local base is behind its remote it
+  shows those incoming commits; otherwise it shows what the last update brought,
+  using the base branch's reflog (`main@{1}..main`). The overlap list is the
+  intersection of the files in that range and the files your branch changed.
+- **hook** runs the `status` classification with a 5 second fetch timeout and
+  prints one line, or nothing. It exits immediately unless
+  `session_hook=on` is in the config file.
+
 ## Running the script directly
 
 It has no dependency on Claude Code:

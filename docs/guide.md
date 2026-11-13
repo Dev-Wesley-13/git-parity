@@ -72,6 +72,21 @@ how far ahead of the base it is, whether it is pushed, its pull request, and
 which branch must be merged first when branches are stacked. Use it before a
 release to see what is still missing.
 
+## Pull requests and news
+
+```
+/git-parity:prs
+/git-parity:whats-new
+```
+
+`prs` answers "what is blocked on me": your open pull requests ordered by
+urgency (failing checks, conflicts, requested changes first), then the ones
+teammates are waiting for you to review.
+
+`whats-new` answers "what did the others merge": a short briefing of the commits
+that came into each base branch, and a warning for every file that was also
+changed on your current branch.
+
 ## Housekeeping
 
 ```
@@ -106,3 +121,6 @@ reminds you to push it to your fork.
 | `GIT_PARITY_CONFIG_DIR` | `~/.config/git-parity` | Where `repos` and `never-push` live. |
 | `GIT_PARITY_JOBS` | `8` | Parallel repositories. |
 | `GIT_PARITY_FETCH_TIMEOUT` | `30` | Seconds before a fetch is abandoned (needs `timeout`). |
+| `GIT_PARITY_FORGE` | from `origin` URL | `github` or `gitlab`, for self-hosted servers. |
+
+`~/.config/git-parity/config` holds one optional line, `session_hook=on`.
