@@ -92,7 +92,10 @@ confirm the script the first time each command runs.
 ### Windows
 
 The script is bash. On Windows use Git Bash, or WSL when your repositories live there.
-The skills tell the agent to run it that way.
+The skills tell the agent to run it that way. Desktop agents run in a sandbox and will
+ask your permission the first time they call `wsl.exe`; that is expected.
+If you cloned the repository with an older version on Windows, update it: versions before
+1.3.2 could be checked out with CRLF line endings, which bash cannot run.
 
 ### What works where
 
