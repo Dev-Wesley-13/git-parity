@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-11-16
+
+### Added
+
+- Automatic detection. With no saved list, git-parity finds the repositories of the current
+  project (same parent folder, same remote owner) or of a folder of projects, proposes named
+  groups, and the agent asks before saving. No first-run setup.
+- `/git-parity:add`: save, list (`--list`) or remove (`--remove`) tracked repositories and
+  groups. The script gained `detect` and `add`.
+- Docs reorganized: getting started, commands, configuration, agents, troubleshooting;
+  `CONTRIBUTING.md` and `SECURITY.md`.
+
+### Changed
+
+- **License: PolyForm Shield 1.0.0 from this version on.** Free to use, copy, modify and
+  share; not to be offered as a competing product. Versions 1.0.0 to 1.3.3 remain under MIT.
+- Until a list is saved, `remote`, `full`, `local` and `cleanup` act on the current
+  repository only. Previously, run from a folder of projects, they acted on every repository
+  found there.
+- A note is printed when the current repository is not in the saved list.
+
 ## [1.3.3] - 2026-11-16
 
 ### Changed

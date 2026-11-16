@@ -81,18 +81,19 @@ capped per repository.
   prints one line, or nothing. It exits immediately unless
   `session_hook=on` is in the config file.
 
-## One repository, four agents
+## Finding repositories
 
-| Agent | Reads | How the script runs |
-|---|---|---|
-| Claude Code | `.claude-plugin/`, `skills/`, `hooks/claude-hooks.json` | Injected when the skill loads |
-| Codex | `.codex-plugin/`, `.agents/plugins/marketplace.json`, `skills/` | The agent runs it, following the skill |
-| Antigravity | `plugin.json` (root), `skills/` | The agent runs it, following the skill; on Windows through Git Bash or `wsl bash` |
-| Gemini CLI | `gemini-extension.json`, `commands/git-parity/*.toml`, `skills/` | Injected by the command, after you confirm |
+With no saved list the script detects. Inside a repository it scans the parent folder (two
+levels) and keeps the repositories whose `origin` URL has the same owner; elsewhere it scans
+the current folder and groups by owner. Group names come from the common prefix of the folder
+names. What it cannot decide is printed under "Ask the user about", and the skills tell the
+agent to ask before saving anything.
 
-The Gemini commands call the script at `~/.gemini/extensions/git-parity/`, where
-`gemini extensions install` puts it. An extension added with `extensions link`
-lives elsewhere, so use the skills there instead of the slash commands.
+Detected repositories are trusted for reading only. `remote`, `full`, `local` and `cleanup`
+stay on the current repository until the list is saved with `add`, which is the only command
+that writes a file: `~/.config/git-parity/repos`, with the previous version kept as `repos.bak`.
+
+How each agent loads all this: [agents.md](agents.md).
 
 ## Running the script directly
 
@@ -103,4 +104,6 @@ bash scripts/git-parity.sh status ~/code/api ~/code/web
 bash scripts/git-parity.sh remote --no-fetch
 bash scripts/git-parity.sh feature 'feat/login*' work
 bash scripts/git-parity.sh cleanup
+bash scripts/git-parity.sh detect
+bash scripts/git-parity.sh add --group work ~/code/api ~/code/web
 ```

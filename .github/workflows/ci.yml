@@ -23,6 +23,9 @@ jobs:
           data = {f: json.load(open(f)) for f in files}
           versions = {data[f]["version"] for f in (".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "gemini-extension.json", "plugin.json")}
           assert len(versions) == 1, f"version mismatch across manifests: {versions}"
+          licenses = {data[f]["license"] for f in (".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "plugin.json")}
+          assert licenses == {"PolyForm-Shield-1.0.0"}, f"license mismatch across manifests: {licenses}"
+          assert open("LICENSE").read().startswith("# PolyForm Shield License 1.0.0"), "LICENSE is not the PolyForm Shield text"
           skills = sorted(p.split("/")[1] for p in glob.glob("skills/*/SKILL.md"))
           commands = sorted(p.split("/")[-1][:-5] for p in glob.glob("commands/git-parity/*.toml"))
           assert skills == commands, f"skills and Gemini commands differ: {skills} vs {commands}"

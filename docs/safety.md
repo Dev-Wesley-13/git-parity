@@ -14,8 +14,12 @@ git-parity is built so that the worst outcome of running it is "nothing happened
 - prompts for credentials (a fetch that needs them fails and is reported).
 
 The only writes it performs are `git fetch --prune` (updates remote-tracking
-refs) and, in `remote`/`full`, fast-forwards of local branches that are strictly
-behind their own upstream.
+refs), fast-forwards of local branches that are strictly behind their own upstream
+(`remote`/`full`), and its own list of repositories (`add`), which lives in
+`~/.config/git-parity/` and never inside a repository.
+
+Repositories found by detection, before you save a list, are only read: the commands that
+change something act on the current repository alone until you confirm the list.
 
 ## The skills never
 
@@ -23,7 +27,8 @@ behind their own upstream.
 - push a base branch or a branch listed in `never-push`;
 - add `--force`, `--force-with-lease` or `--no-verify`;
 - commit on your behalf;
-- resolve a divergence on their own.
+- resolve a divergence on their own;
+- save detected repositories without asking you.
 
 The one skill that deletes is `cleanup`, and only local branches the script
 proved merged, one approval per repository. It never deletes remote branches.
