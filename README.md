@@ -97,6 +97,19 @@ ask your permission the first time they call `wsl.exe`; that is expected.
 If you cloned the repository with an older version on Windows, update it: versions before
 1.3.2 could be checked out with CRLF line endings, which bash cannot run.
 
+### First run (30 seconds)
+
+After installing, tell git-parity which repositories you work on. One path per line:
+
+```bash
+mkdir -p ~/.config/git-parity
+printf '%s\n' ~/code/api ~/code/web ~/code/mobile > ~/.config/git-parity/repos
+```
+
+Then, in any session: `/git-parity:status`. Without that file it checks the repository you are in,
+or the repositories found up to two levels below the current folder. More in
+[Which repositories](#which-repositories).
+
 ### What works where
 
 | | Claude Code | Codex | Antigravity | Gemini CLI |
@@ -225,6 +238,26 @@ collapsed into the `Clean` line.
 | `FORK-BEHIND n` | Your fork's base is `n` commits behind `upstream`. | Fast-forwards the local base in `remote`/`full`; you push it. |
 | `BRANCHES` | Current branch is fine; another branch needs attention. | See Detail. |
 | `OK` | Clean, with something worth knowing (for example `main updated +3`). | Done. |
+
+## Token cost
+
+The work is done by a script, so the model mostly reads one finished report.
+
+| | Tokens (estimated) |
+|---|---|
+| Always in context, Claude Code (4 model-invocable skills; the others are user-only) | about 290 |
+| Always in context, Codex and Gemini (all 8 skills listed) | about 540 |
+| One command: skill file | 600 to 800 |
+| One command: the report | 40 to 600 (about 110 for a clean `status` of 5 repositories) |
+
+Measured end to end: a `status` on Claude Haiku cost about $0.013, and on the Codex CLI about 4,700
+tokens in total, most of which is each agent's own overhead. Estimates use about 3.6 characters per token.
+
+## Tested models
+
+`status` was run, with correct results, on Claude Haiku 5.5, GPT Terra (Codex, low effort),
+Gemini 3.8 Flash (Antigravity) and the stronger default models of each agent. `whats-new`, which needs
+the most judgment, was run on Haiku.
 
 ## Documentation
 

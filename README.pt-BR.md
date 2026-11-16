@@ -154,6 +154,37 @@ Com isso, ao abrir o Claude Code aparece uma linha quando algo precisa de você.
 Não imprime nada se tudo está limpo e nunca altera nada. Vem desligado porque
 adiciona um fetch a cada início de sessão.
 
+## Uma feature em vários repositórios
+
+```
+/git-parity:feature checkout work
+```
+
+Mostra, numa tabela, todas as branches cujo nome contém `checkout` em cada repositório: quanto estão à
+frente da base, se foram enviadas, o pull request e a ordem de merge quando uma branch depende de outra.
+
+## Primeiros passos
+
+Depois de instalar, diga quais repositórios você usa, um caminho por linha:
+
+```bash
+mkdir -p ~/.config/git-parity
+printf '%s\n' ~/code/api ~/code/web ~/code/mobile > ~/.config/git-parity/repos
+```
+
+Em seguida, em qualquer sessão: `/git-parity:status`.
+
+## Custo em tokens
+
+O trabalho é feito por um script; o modelo lê um relatório pronto. Sempre em contexto: cerca de 290 tokens
+no Claude Code e 540 no Codex e no Gemini. Por comando: 600 a 800 da skill mais 40 a 600 do relatório.
+Medido: um `status` no Claude Haiku custou cerca de US$ 0,013.
+
+## Modelos testados
+
+`status` foi executado, com resultado correto, no Claude Haiku 5.5, no GPT Terra (Codex, esforço baixo) e
+no Gemini 3.8 Flash (Antigravity), além dos modelos padrão de cada agente.
+
 ## Branches protegidas
 
 A branch base (`origin/HEAD`, senão `main`, senão `master`) nunca é oferecida para
