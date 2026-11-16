@@ -3,7 +3,7 @@
 [![CI](https://github.com/Dev-Wesley-13/git-parity/actions/workflows/ci.yml/badge.svg)](https://github.com/Dev-Wesley-13/git-parity/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Keep local and remote git branches in parity across all your repositories, from one command in Claude Code, Codex or Gemini CLI.**
+**Keep local and remote git branches in parity across all your repositories, from one command in Claude Code, Codex or Antigravity (Gemini).**
 
 `git-parity` checks every repository you work on, fast-forwards what is safe to
 fast-forward, offers to push what is only on your machine, and gives you one short
@@ -45,25 +45,40 @@ Next steps
 
 ## Install
 
-### Claude Code
+Works in **Claude Code**, **Codex** and **Google Antigravity** (the successor of Gemini CLI),
+in the terminal and in the desktop apps. Gemini CLI is still supported.
+
+### Claude Code (terminal, desktop app, IDE)
 
 ```
 /plugin marketplace add Dev-Wesley-13/git-parity
 /plugin install git-parity@git-parity
 ```
 
-Update with `/plugin update git-parity@git-parity`. Remove with
-`/plugin uninstall git-parity@git-parity`.
+The same commands work in the desktop app; from a shell use
+`claude plugin marketplace add Dev-Wesley-13/git-parity` and
+`claude plugin install git-parity@git-parity`. Update with
+`/plugin update git-parity@git-parity`, remove with `/plugin uninstall git-parity@git-parity`.
+Commands: `/git-parity:status`, `/git-parity:remote`, and so on.
 
-### Codex
+### Codex (CLI and desktop app)
 
 ```bash
 codex plugin marketplace add Dev-Wesley-13/git-parity
 codex plugin add git-parity@git-parity
 ```
 
-The skills are then available by name: ask for "git-parity status", or type `$`
-and pick one.
+Then ask for it by name ("use the git-parity status skill") or type `$` and pick a skill.
+
+### Antigravity (CLI `agy` and desktop app)
+
+```bash
+agy plugin install https://github.com/Dev-Wesley-13/git-parity
+```
+
+In the desktop app, install the same repository from the Plugins page of Customizations
+(or ask the agent to install it from the GitHub URL). Antigravity exposes the commands as
+skills, so type `/git-parity:status`-style requests as a message ("run git-parity status").
 
 ### Gemini CLI
 
@@ -71,24 +86,26 @@ and pick one.
 gemini extensions install https://github.com/Dev-Wesley-13/git-parity
 ```
 
-Commands are `/git-parity:status`, `/git-parity:remote` and so on. Gemini CLI
-asks you to confirm the script the first time each command runs.
+Commands are `/git-parity:status`, `/git-parity:remote` and so on. Gemini CLI asks you to
+confirm the script the first time each command runs.
+
+### Windows
+
+The script is bash. On Windows use Git Bash, or WSL when your repositories live there.
+The skills tell the agent to run it that way.
 
 ### What works where
 
-| | Claude Code | Codex | Gemini CLI |
-|---|---|---|---|
-| All eight commands | Yes | Yes, as skills | Yes |
-| Report arrives without an extra tool call | Yes | No, the agent runs the script once | Yes |
-| Session-start reminder | Yes (opt-in) | No | No |
-| Tested by | Automated suite and real sessions | Installs and loads; see note | Validates and loads; see note |
+| | Claude Code | Codex | Antigravity | Gemini CLI |
+|---|---|---|---|---|
+| All eight commands | Yes | Yes, as skills | Yes, as skills | Yes |
+| Report arrives with no extra tool call | Yes | No, the agent runs the script once | No, same | Yes |
+| Session-start reminder | Yes (opt-in) | No | No | No |
+| Verified by the author | CLI and desktop, real sessions | CLI, real session | Loads and validates; see note | Installs and loads; see note |
 
-Note: on Codex and Gemini CLI the plugin was verified to install and to expose
-every skill and command, with the same script and test suite underneath. Full
-conversations on those two agents have not been exercised by the author yet.
+Note: Antigravity and Gemini CLI were verified to load every skill and command, with the same
+script and test suite underneath, but full conversations on them were not exercised yet.
 [Reports](https://github.com/Dev-Wesley-13/git-parity/issues) are welcome.
-
-Requirements: git 2.23+, bash 3.2+ (Linux, macOS, WSL, Git Bash).
 
 ## Commands
 

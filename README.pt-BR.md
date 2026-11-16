@@ -1,6 +1,6 @@
 # git-parity
 
-**Mantenha branches locais e remotas em paridade em todos os seus repositórios, com um comando no Claude Code, Codex ou Gemini CLI.**
+**Mantenha branches locais e remotas em paridade em todos os seus repositórios, com um comando no Claude Code, Codex ou Antigravity (Gemini).**
 
 O `git-parity` verifica cada repositório em que você trabalha, faz fast-forward do
 que é seguro, oferece enviar o que só existe na sua máquina e entrega um relatório
@@ -44,34 +44,56 @@ O script imprime em inglês; o Claude apresenta o relatório no seu idioma.
 
 ## Instalação
 
-No Claude Code:
+Funciona no **Claude Code**, no **Codex** e no **Google Antigravity** (sucessor do Gemini CLI),
+no terminal e nos apps desktop. O Gemini CLI continua suportado.
+
+### Claude Code (terminal, app desktop, IDE)
 
 ```
 /plugin marketplace add Dev-Wesley-13/git-parity
 /plugin install git-parity@git-parity
 ```
 
-Atualize com `/plugin update git-parity@git-parity`. Remova com
-`/plugin uninstall git-parity@git-parity`.
+Pelo shell: `claude plugin marketplace add Dev-Wesley-13/git-parity` e
+`claude plugin install git-parity@git-parity`. Atualize com `/plugin update git-parity@git-parity`.
 
-No Codex:
+### Codex (CLI e app desktop)
 
 ```bash
 codex plugin marketplace add Dev-Wesley-13/git-parity
 codex plugin add git-parity@git-parity
 ```
 
-No Gemini CLI:
+### Antigravity (CLI `agy` e app desktop)
+
+```bash
+agy plugin install https://github.com/Dev-Wesley-13/git-parity
+```
+
+No app desktop, instale o mesmo repositório pela página de Plugins em Customizations. O
+Antigravity expõe os comandos como skills: peça em linguagem natural ("rode o git-parity status").
+
+### Gemini CLI
 
 ```bash
 gemini extensions install https://github.com/Dev-Wesley-13/git-parity
 ```
 
-No Codex e no Gemini CLI a instalação e o carregamento das skills e comandos
-foram verificados; conversas completas nesses dois agentes ainda não foram
-exercitadas pelo autor. O lembrete de início de sessão existe só no Claude Code.
+### Windows
 
-Requisitos: git 2.23+, bash 3.2+ (Linux, macOS, WSL, Git Bash).
+O script é bash. No Windows use Git Bash, ou WSL quando os repositórios estão lá.
+
+### O que funciona onde
+
+| | Claude Code | Codex | Antigravity | Gemini CLI |
+|---|---|---|---|---|
+| Os oito comandos | Sim | Sim, como skills | Sim, como skills | Sim |
+| Relatório chega sem tool call extra | Sim | Não | Não | Sim |
+| Lembrete ao abrir a sessão | Sim (opcional) | Não | Não | Não |
+| Verificado pelo autor | CLI e desktop, sessões reais | CLI, sessão real | Carrega e valida | Instala e carrega |
+
+No Antigravity e no Gemini CLI foi verificado que todas as skills e comandos carregam; conversas
+completas ainda não foram exercitadas.
 
 ## Comandos
 

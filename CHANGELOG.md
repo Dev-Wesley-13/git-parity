@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] - 2026-11-16
+
+### Added
+
+- Antigravity: native `plugin.json` at the repository root, so
+  `agy plugin install https://github.com/Dev-Wesley-13/git-parity` installs it as a
+  native plugin (skills load as they are).
+- Windows note in every skill: run the script with Git Bash, or `wsl bash` when the
+  repositories live in WSL.
+
+### Changed
+
+- README installation section covers Claude Code, Codex, Antigravity and Gemini CLI,
+  terminal and desktop, with a table of what works where.
+
 ## [1.3.0] - 2026-11-13
 
 ### Added

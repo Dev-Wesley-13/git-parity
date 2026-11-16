@@ -20,6 +20,13 @@ unless you approve it.
 3. Ask: "Use the git-parity status skill." The agent should run `scripts/git-parity.sh status` once and show the report.
 4. Ask for the `local` skill and decline the push.
 
+## Antigravity
+
+1. `agy plugin install https://github.com/Dev-Wesley-13/git-parity`, or install from the Plugins page of Customizations in the desktop app.
+2. The plugin appears with eight skills.
+3. Ask: "Use the git-parity status skill with --no-fetch." The agent should run the script once and show the report.
+4. Ask for the `local` skill and decline the push.
+
 ## Gemini CLI
 
 1. `gemini extensions install https://github.com/Dev-Wesley-13/git-parity`.

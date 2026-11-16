@@ -14,6 +14,8 @@ Report (already generated; nothing was deleted):
 
 If no report appears above (only Claude Code runs that line), run the script once yourself and use its output: `bash <plugin-root>/scripts/git-parity.sh cleanup <arguments the user gave>`, where `<plugin-root>` is two directories above this file.
 
+On Windows the script needs a POSIX shell: run it with Git Bash, or with `wsl bash` and the script path converted by `wslpath` when the repositories live in WSL. Do not reimplement it in PowerShell.
+
 ## What to do
 
 1. Show the report grouped as it is, translating prose to the user's language; keep names and commands verbatim. For long lists, show the count and the first few names, and offer the full list.

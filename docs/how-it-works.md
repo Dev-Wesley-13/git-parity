@@ -81,12 +81,13 @@ capped per repository.
   prints one line, or nothing. It exits immediately unless
   `session_hook=on` is in the config file.
 
-## One repository, three agents
+## One repository, four agents
 
 | Agent | Reads | How the script runs |
 |---|---|---|
 | Claude Code | `.claude-plugin/`, `skills/`, `hooks/claude-hooks.json` | Injected when the skill loads |
 | Codex | `.codex-plugin/`, `.agents/plugins/marketplace.json`, `skills/` | The agent runs it, following the skill |
+| Antigravity | `plugin.json` (root), `skills/` | The agent runs it, following the skill; on Windows through Git Bash or `wsl bash` |
 | Gemini CLI | `gemini-extension.json`, `commands/git-parity/*.toml`, `skills/` | Injected by the command, after you confirm |
 
 The Gemini commands call the script at `~/.gemini/extensions/git-parity/`, where

@@ -19,9 +19,9 @@ jobs:
           python3 - <<'PY'
           import glob, json
           files = [".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", ".codex-plugin/plugin.json",
-                   ".agents/plugins/marketplace.json", "gemini-extension.json", "hooks/claude-hooks.json"]
+                   ".agents/plugins/marketplace.json", "gemini-extension.json", "plugin.json", "hooks/claude-hooks.json"]
           data = {f: json.load(open(f)) for f in files}
-          versions = {data[f]["version"] for f in (".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "gemini-extension.json")}
+          versions = {data[f]["version"] for f in (".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "gemini-extension.json", "plugin.json")}
           assert len(versions) == 1, f"version mismatch across manifests: {versions}"
           skills = sorted(p.split("/")[1] for p in glob.glob("skills/*/SKILL.md"))
           commands = sorted(p.split("/")[-1][:-5] for p in glob.glob("commands/git-parity/*.toml"))
