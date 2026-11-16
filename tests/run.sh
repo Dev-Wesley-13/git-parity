@@ -397,7 +397,8 @@ rm "$GIT_PARITY_CONFIG_DIR/repos" "$GIT_PARITY_CONFIG_DIR/config"
 # 27a. no CRLF in anything bash or an agent reads (Windows clones must keep LF; see .gitattributes)
 crlf=$(cd "$HERE/.." && grep -rIl $'\r' scripts skills commands hooks .gitattributes plugin.json gemini-extension.json .claude-plugin .codex-plugin 2>/dev/null)
 eq "no CRLF in shipped files" "$crlf" ""
-has "gitattributes forces LF for scripts" "$(cat "$HERE/../.gitattributes")" "*.sh text eol=lf"
+has "gitattributes turns line-ending conversion off" "$(cat "$HERE/../.gitattributes")" "* -text"
+hasnt "skills never climb out of the plugin folder" "$(cat "$HERE"/../skills/*/SKILL.md | grep '^!')" ".."
 
 # 27. arguments from agents that pass one quoted string, or an empty one
 Q1=$(new q-a); Q2=$(new q-b)

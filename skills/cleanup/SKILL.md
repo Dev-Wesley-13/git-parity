@@ -10,7 +10,7 @@ allowed-tools: Bash(bash *git-parity.sh*)
 
 Report (already generated; nothing was deleted):
 
-!`bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" cleanup $ARGUMENTS`
+!`bash "${CLAUDE_PLUGIN_ROOT}/scripts/git-parity.sh" cleanup $ARGUMENTS`
 
 If no report appears above (only Claude Code runs that line), run the script once yourself and use its output: `bash <plugin-root>/scripts/git-parity.sh cleanup <arguments the user gave>`, where `<plugin-root>` is two directories above this file.
 

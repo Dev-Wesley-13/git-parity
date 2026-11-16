@@ -9,7 +9,7 @@ allowed-tools: Bash(bash *git-parity.sh*)
 
 Raw data (already generated, nothing was changed; only `git fetch` ran):
 
-!`bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" whats-new $ARGUMENTS`
+!`bash "${CLAUDE_PLUGIN_ROOT}/scripts/git-parity.sh" whats-new $ARGUMENTS`
 
 If no data appears above (only Claude Code runs that line), run the script once yourself and use its output: `bash <plugin-root>/scripts/git-parity.sh whats-new <arguments the user gave>`, where `<plugin-root>` is two directories above this file.
 

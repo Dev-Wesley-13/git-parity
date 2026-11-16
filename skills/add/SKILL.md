@@ -11,7 +11,7 @@ git-parity finds repositories on its own: inside a repository it takes the ones 
 
 Result of the request (the saved list is the only file this ever changes; repositories are never touched):
 
-!`bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" add $ARGUMENTS`
+!`bash "${CLAUDE_PLUGIN_ROOT}/scripts/git-parity.sh" add $ARGUMENTS`
 
 If no result appears above (only Claude Code runs that line), run it yourself: `bash <plugin-root>/scripts/git-parity.sh add <arguments>`, where `<plugin-root>` is two directories above this file. On Windows with repositories in WSL: `wsl.exe -d <distro> -- bash -c 'bash "$(wslpath -u <windows-path-with-forward-slashes>/scripts/git-parity.sh)" add <arguments>'`.
 

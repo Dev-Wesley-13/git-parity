@@ -10,7 +10,7 @@ allowed-tools: Bash(bash *git-parity.sh*)
 
 Report (already generated; branches strictly behind were fast-forwarded first, then push candidates were listed; nothing was pushed):
 
-!`bash "${CLAUDE_SKILL_DIR}/../../scripts/git-parity.sh" full $ARGUMENTS`
+!`bash "${CLAUDE_PLUGIN_ROOT}/scripts/git-parity.sh" full $ARGUMENTS`
 
 If no report appears above (only Claude Code runs that line), run the script once yourself and use its output: `bash <plugin-root>/scripts/git-parity.sh full <arguments the user gave>`, where `<plugin-root>` is two directories above this file.
 
