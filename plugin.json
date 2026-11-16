@@ -1,7 +1,7 @@
 {
   "name": "git-parity",
   "displayName": "git-parity",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Keep local and remote git branches in parity across many repositories: safe fast-forward sync, push and PR offers, and a short report with next steps.",
   "author": {
     "name": "Wesley Rafael Fonseca",

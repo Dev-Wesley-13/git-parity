@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.3] - 2026-11-16
+
+### Changed
+
+- The Windows note in every skill now gives the exact `wsl.exe ... wslpath` command, which
+  the Codex desktop app needed two attempts to get right.
+
 ## [1.3.2] - 2026-11-16
 
 ### Fixed

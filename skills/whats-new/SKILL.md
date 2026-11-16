@@ -13,7 +13,11 @@ Raw data (already generated, nothing was changed; only `git fetch` ran):
 
 If no data appears above (only Claude Code runs that line), run the script once yourself and use its output: `bash <plugin-root>/scripts/git-parity.sh whats-new <arguments the user gave>`, where `<plugin-root>` is two directories above this file.
 
-On Windows the script needs a POSIX shell: run it with Git Bash, or with `wsl bash` and the script path converted by `wslpath` when the repositories live in WSL. Do not reimplement it in PowerShell.
+On Windows the script needs a POSIX shell. When the repositories live in WSL, run exactly this (replace the path with the Windows path of the script; the quoting is deliberate):
+
+`wsl.exe -d <distro> -- bash -c 'bash "$(wslpath -u "<windows path to scripts/git-parity.sh>")" whats-new <arguments>'`
+
+Otherwise use Git Bash. Do not reimplement the script in PowerShell, and do not edit line endings: the file already uses LF.
 
 ## What to do
 
