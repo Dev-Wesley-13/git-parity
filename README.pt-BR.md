@@ -90,10 +90,11 @@ O script é bash. No Windows use Git Bash, ou WSL quando os repositórios estão
 | Os oito comandos | Sim | Sim, como skills | Sim, como skills | Sim |
 | Relatório chega sem tool call extra | Sim | Não | Não | Sim |
 | Lembrete ao abrir a sessão | Sim (opcional) | Não | Não | Não |
-| Verificado pelo autor | CLI e desktop, sessões reais | CLI, sessão real | Carrega e valida | Instala e carrega |
+| Verificado pelo autor | CLI e desktop, sessões reais | CLI (WSL) e desktop (Windows), sessões reais | App desktop, sessão real | Instala e carrega |
 
-No Antigravity e no Gemini CLI foi verificado que todas as skills e comandos carregam; conversas
-completas ainda não foram exercitadas.
+No Antigravity, o app desktop foi testado de ponta a ponta com o plugin carregado de uma pasta de
+projeto (`.agents/plugins/`); `agy plugin install` e a instalação por URL dentro do app não foram
+exercitados. No Gemini CLI foi verificado que os comandos instalam e carregam, sem conversa completa.
 
 ## Comandos
 

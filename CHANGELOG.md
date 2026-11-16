@@ -8,8 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- The Windows note in every skill now gives the exact `wsl.exe ... wslpath` command, which
-  the Codex desktop app needed two attempts to get right.
+- The Windows note in every skill now gives the exact `wsl.exe ... wslpath` command, with
+  forward slashes and no inner quotes. Without it, the Codex desktop app needed four attempts and
+  the Antigravity desktop app three (quotes are stripped by PowerShell, backslashes eaten by bash).
 
 ## [1.3.2] - 2026-11-16
 

@@ -24,7 +24,7 @@ unless you approve it.
 
 1. `agy plugin install https://github.com/Dev-Wesley-13/git-parity`, or install from the Plugins page of Customizations in the desktop app.
 2. The plugin appears with eight skills.
-3. Ask: "Use the git-parity status skill with --no-fetch." The agent should run the script once and show the report.
+3. Ask: "Use the git-parity status skill with --no-fetch." The agent should run the script and show the report. Expect a permission prompt for `wsl.exe` the first time.
 4. Ask for the `local` skill and decline the push.
 
 ## Gemini CLI

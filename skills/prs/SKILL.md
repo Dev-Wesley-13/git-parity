@@ -13,11 +13,11 @@ Report (already generated, nothing was changed):
 
 If no report appears above (only Claude Code runs that line), run the script once yourself and use its output: `bash <plugin-root>/scripts/git-parity.sh prs <arguments the user gave>`, where `<plugin-root>` is two directories above this file.
 
-On Windows the script needs a POSIX shell. When the repositories live in WSL, run exactly this (replace the path with the Windows path of the script; the quoting is deliberate):
+On Windows the script needs a POSIX shell. When the repositories live in WSL, run this (the quoting is deliberate: write the script's Windows path with forward slashes, no backslashes and no inner quotes, because PowerShell strips the quotes and bash eats backslashes):
 
-`wsl.exe -d <distro> -- bash -c 'bash "$(wslpath -u "<windows path to scripts/git-parity.sh>")" prs <arguments>'`
+`wsl.exe -d <distro> -- bash -c 'bash "$(wslpath -u <windows-path-with-forward-slashes>/scripts/git-parity.sh)" prs <arguments>'`
 
-Otherwise use Git Bash. Do not reimplement the script in PowerShell, and do not edit line endings: the file already uses LF.
+Examples of the path: `C:/Users/me/.codex/plugins/cache/git-parity/git-parity/1.3.3` or `//wsl.localhost/Ubuntu-24.04/home/me/project/.agents/plugins/git-parity`. Otherwise use Git Bash. Do not reimplement the script in PowerShell, and do not edit line endings: the file already uses LF.
 
 ## What to do
 

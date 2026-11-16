@@ -104,10 +104,12 @@ If you cloned the repository with an older version on Windows, update it: versio
 | All eight commands | Yes | Yes, as skills | Yes, as skills | Yes |
 | Report arrives with no extra tool call | Yes | No, the agent runs the script once | No, same | Yes |
 | Session-start reminder | Yes (opt-in) | No | No | No |
-| Verified by the author | CLI and desktop, real sessions | CLI, real session | Loads and validates; see note | Installs and loads; see note |
+| Verified by the author | CLI and desktop, real sessions | CLI (WSL) and desktop (Windows), real sessions | Desktop app, real session; see note | Installs and loads; see note |
 
-Note: Antigravity and Gemini CLI were verified to load every skill and command, with the same
-script and test suite underneath, but full conversations on them were not exercised yet.
+Note: on Antigravity the desktop app was tested end to end with the plugin loaded from a project
+folder (`.agents/plugins/`); `agy plugin install` and the in-app install from a URL were not
+exercised. Gemini CLI was verified to install and load every command, but no full conversation
+was run. The same script and test suite sit under all of them.
 [Reports](https://github.com/Dev-Wesley-13/git-parity/issues) are welcome.
 
 ## Commands
