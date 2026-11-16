@@ -20,6 +20,8 @@ On Windows the script needs a POSIX shell. When the repositories live in WSL, ru
 
 Examples of the path: `C:/Users/me/.codex/plugins/cache/git-parity/git-parity/1.3.3` or `//wsl.localhost/Ubuntu-24.04/home/me/project/.agents/plugins/git-parity`. Otherwise use Git Bash. Do not reimplement the script in PowerShell, and do not edit line endings: the file already uses LF.
 
+If the output ends with a "Setup" section or a "Note:" about the current repository, no list (or not this repository) is saved yet. After the report, tell the user in one or two sentences which groups were detected, ask about anything listed under "Ask the user about", and ask once whether to save. On a yes, run the printed `add` command(s) exactly; if a command fails, show it so the user can run it. Do not ask again in this session after a no.
+
 ## What to do
 
 1. Show the report as is. Translate prose to the user's language; keep names, states and commands verbatim.

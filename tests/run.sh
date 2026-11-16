@@ -211,7 +211,6 @@ out=$(bash "$GP" status)
 has "repos file" "$out" "2 repo(s)"
 rm "$GIT_PARITY_CONFIG_DIR/repos"
 out=$(cd "$A" && bash "$GP" status --no-fetch)
-has "cwd repo" "$out" "1 repo(s)"
 has "no-fetch" "$out" "no fetch"
 mkdir -p "$T/scan/x" "$T/scan/grp/y"; git init -q "$T/scan/x"; git init -q "$T/scan/grp/y"; mkdir -p "$T/scan/a/b/c/z"; git init -q "$T/scan/a/b/c/z"
 out=$(cd "$T/scan" && bash "$GP" status)
@@ -410,6 +409,84 @@ g "$Q1" checkout -q -b feat/zed; commit "$Q1" z
 out=$(bash "$GP" feature "zed $Q1 --no-fetch"); has "args/feature pattern from one string" "$out" "| q-a | feat/zed |"
 out=$(bash "$GP" feature "");                   has "args/feature empty string" "$out" "a branch name or pattern is needed"
 out=$(bash "$GP" status --no-fetch "$T/with space/sp"); has "args/real path with spaces kept" "$out" "| sp | main |"
+
+# --- 1.4.0: detection, groups by remote owner, add ----------------------------
+
+# newo <owner> <name> <parent dir>: clone whose origin URL ends in <owner>/<name>.git
+newo() {
+  local bare="$T/remotes/$1/$2.git" d="$3/$2"
+  mkdir -p "$T/remotes/$1" "$3"
+  git init -q --bare -b main "$bare"
+  git clone -q "$bare" "$d" 2>/dev/null
+  g "$d" checkout -q -b main 2>/dev/null
+  commit "$d" init; g "$d" push -q -u origin main; g "$d" remote set-head origin main
+  echo "$d"
+}
+WS="$T/ws"
+S1=$(newo acme shop-api "$WS"); S2=$(newo acme shop-web "$WS"); S3=$(newo acme shop-app "$WS")
+TL=$(newo solo tool "$WS/nested")
+mkdir -p "$WS/shop-notes"; git init -q -b main "$WS/shop-notes"; commit "$WS/shop-notes" init
+[ -f "$GIT_PARITY_CONFIG_DIR/repos" ] && rm "$GIT_PARITY_CONFIG_DIR/repos"
+
+# 28. detect: groups by owner, names by common prefix, doubts are listed
+out=$(cd "$S1" && bash "$GP" detect)
+has "detect/group by owner" "$out" "- [shop] 3 repo(s), remote owner acme:"
+has "detect/single repo named after its remote" "$out" "- [tool] 1 repo(s), remote owner solo:"
+has "detect/no remote is a doubt" "$out" "shop-notes: no remote"
+has "detect/same prefix, other owner is a doubt" "$out" "named like group [shop] but its remote owner is different"
+has "detect/save command" "$out" "add --group shop "
+has "detect/nothing saved" "$out" "0 saved"
+eq  "detect/writes nothing" "$(ls "$GIT_PARITY_CONFIG_DIR")" ""
+out=$(cd "$WS" && bash "$GP" detect)
+has "detect/from the parent folder" "$out" "5 repo(s) found"
+
+# 29. no saved list: read-only modes use the detected group, changing modes stay on the current repository
+out=$(cd "$S1" && bash "$GP" status --no-fetch)
+has "auto/status covers the group" "$out" "status · 3 repo(s)"
+has "auto/setup block" "$out" "Setup (no saved repository list yet; this run covered the detected group [shop])"
+remote_commit_o() { local w="$T/remotes/$1/$2.w"; git clone -q "$T/remotes/$1/$2.git" "$w"; commit "$w" r; g "$w" push -q origin main; }
+remote_commit_o acme shop-web
+old=$(sha "$S2" main)
+out=$(cd "$S1" && bash "$GP" remote)
+has "auto/remote covers one repo" "$out" "remote · 1 repo(s)"
+has "auto/remote says why" "$out" "only the current repository"
+eq  "auto/sibling not fast-forwarded before a list is saved" "$(sha "$S2" main)" "$old"
+out=$(cd "$WS" && bash "$GP" status --no-fetch)
+has "auto/folder: every detected repo" "$out" "status · 5 repo(s)"
+out=$(cd "$WS" && bash "$GP" remote)
+has "auto/folder: changing mode selects nothing" "$out" "no repository selected"
+eq  "auto/folder: nothing fast-forwarded" "$(sha "$S2" main)" "$old"
+mkdir -p "$T/alone"; AL=$(newo me only "$T/alone")
+out=$(cd "$AL" && bash "$GP" status --no-fetch)
+has   "auto/single repo works" "$out" "status · 1 repo(s)"
+hasnt "auto/single repo is not nagged" "$out" "Setup"
+
+# 30. add: saves, groups, never duplicates, refuses non-repositories
+out=$(bash "$GP" add --group shop "$S1" "$S2")
+has "add/added" "$out" "added to [shop]:"
+has "add/list" "$out" "Saved list (2 repo(s)):"
+has "add/file has the group" "$(cat "$GIT_PARITY_CONFIG_DIR/repos")" "[shop]"
+out=$(bash "$GP" add --group shop "$S1");        has "add/no duplicates" "$out" "already listed:"
+out=$(bash "$GP" add "$T/nope" "$WS");           has "add/refuses non-repositories" "$out" "skipped, not a git repository"
+out=$(bash "$GP" add "--group tools $TL");       has "add/one quoted string" "$out" "added to [tools]:"
+out=$(bash "$GP" add "$S3/");                    has "add/ungrouped" "$out" "added to ungrouped:"
+out=$(bash "$GP" add --list);                    has "add/list shows groups" "$out" "- [shop] "
+has "add/list shows ungrouped" "$out" "- ungrouped "
+out=$(bash "$GP" add 2>&1);                      has "add/no path explains itself" "$out" "give at least one repository path"
+out=$(bash "$GP" add --group "bad/name" "$S1" 2>&1); eq "add/bad group name" "$?" "2"
+before=$(snapshot "$S1"); bash "$GP" add --group x "$S1" >/dev/null; eq "add/never touches the repository" "$(snapshot "$S1")" "$before"
+
+# 31. with a saved list: no setup block, groups work, changing modes cover the list again
+out=$(cd "$S1" && bash "$GP" status --no-fetch)
+has   "saved/uses the list" "$out" "status · 4 repo(s)"
+hasnt "saved/no setup block" "$out" "Setup"
+out=$(bash "$GP" status --no-fetch shop);        has "saved/group argument" "$out" "status · 2 repo(s)"
+out=$(bash "$GP" remote shop);                   has "saved/remote covers the group" "$out" "main updated +1"
+out=$(cd "$AL" && bash "$GP" status --no-fetch); has "saved/unlisted repository is pointed out" "$out" "Note: the current repository is not in your saved list"
+out=$(bash "$GP" add --remove "$S3");            has "add/remove" "$out" "removed:"
+out=$(bash "$GP" add --remove "$S3");            has "add/remove twice" "$out" "not in the list:"
+has "add/backup kept" "$(ls "$GIT_PARITY_CONFIG_DIR")" "repos.bak"
+rm -f "$GIT_PARITY_CONFIG_DIR/repos" "$GIT_PARITY_CONFIG_DIR/repos.bak"
 
 echo
 echo "passed: $PASS  failed: $FAIL"

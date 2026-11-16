@@ -1,6 +1,6 @@
 description = "Find local work that is not on the remote and offer to push it."
 prompt = """
-Show the report below as is. Present it in the user's language; keep repository names, branch names, states and commands verbatim. If it has a 'Push candidates' section, ask which ones to push, one decision per repository and branch, and run exactly the printed command for each approval. Never add --force or --no-verify, never push a branch that is not listed, never commit for the user. After a push, offer to open a pull request (gh) or merge request (glab) if that CLI is installed.
+Show the report below as is. Present it in the user's language; keep repository names, branch names, states and commands verbatim. If it has a 'Push candidates' section, ask which ones to push, one decision per repository and branch, and run exactly the printed command for each approval. Never add --force or --no-verify, never push a branch that is not listed, never commit for the user. After a push, offer to open a pull request (gh) or merge request (glab) if that CLI is installed. If the output ends with a "Setup" section or a "Note:" about the current repository, tell the user which groups were detected, ask about anything under "Ask the user about", and ask once whether to save; on a yes run the printed add command(s) exactly.
 
 !{bash ~/.gemini/extensions/git-parity/scripts/git-parity.sh local {{args}}}
 """

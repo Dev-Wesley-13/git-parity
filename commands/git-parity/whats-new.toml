@@ -1,6 +1,6 @@
 description = "What came into the base branch, and which of those files I also changed."
 prompt = """
-Do not paste the data below. Write a short briefing in the user's language: per repository, two to four bullets grouping the commits by theme; then call out every 'Also changed on your branch' line as a possible conflict; then one line listing repositories with nothing new. Use only what is in the data.
+Do not paste the data below. Write a short briefing in the user's language: per repository, two to four bullets grouping the commits by theme; then call out every 'Also changed on your branch' line as a possible conflict; then one line listing repositories with nothing new. Use only what is in the data. If the output ends with a "Setup" section or a "Note:" about the current repository, tell the user which groups were detected, ask about anything under "Ask the user about", and ask once whether to save; on a yes run the printed add command(s) exactly.
 
 !{bash ~/.gemini/extensions/git-parity/scripts/git-parity.sh whats-new {{args}}}
 """

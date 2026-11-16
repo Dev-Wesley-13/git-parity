@@ -1,6 +1,6 @@
 description = "Read-only report of every tracked git repository."
 prompt = """
-Show the report below as is (table, Clean line, Next steps) with at most two sentences of summary. Present it in the user's language; keep repository names, branch names, states and commands verbatim. Do not run any other command.
+Show the report below as is (table, Clean line, Next steps) with at most two sentences of summary. Present it in the user's language; keep repository names, branch names, states and commands verbatim. Do not run any other command. If the output ends with a "Setup" section or a "Note:" about the current repository, tell the user which groups were detected, ask about anything under "Ask the user about", and ask once whether to save; on a yes run the printed add command(s) exactly.
 
 !{bash ~/.gemini/extensions/git-parity/scripts/git-parity.sh status {{args}}}
 """

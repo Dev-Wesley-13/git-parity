@@ -3,6 +3,8 @@
 #
 # Usage: git-parity.sh <status|remote|local|full|cleanup|prs|whats-new> [--no-fetch] [repo-path|group ...]
 #        git-parity.sh feature <branch-pattern> [--no-fetch] [repo-path|group ...]
+#        git-parity.sh detect
+#        git-parity.sh add [--group NAME] <repo-path ...> | add --remove <repo-path ...> | add --list
 #        git-parity.sh hook
 #
 #   status   read-only report (only runs `git fetch`)
@@ -13,7 +15,13 @@
 #   cleanup  list branches and worktrees that are safe to delete (deletes nothing)
 #   prs      my open pull/merge requests and the ones waiting for my review
 #   whats-new  commits that came into the base branch, and what they touch on my branch
+#   detect   find repositories near the current folder and propose groups (saves nothing)
+#   add      save repositories to the list in ~/.config/git-parity/repos (the only file ever written)
 #   hook     one line for a session-start hook; silent unless session_hook=on in the config file
+#
+# With no saved list, repositories are detected: inside a repository, the ones beside it with
+# the same remote owner; elsewhere, every repository up to two levels below. Modes that change
+# something then act on the current repository only, until a list is saved.
 #
 # Never pushes, forces, resets, stashes, commits, deletes or checks out anything.
 # Bash 3.2 compatible (macOS): no associative arrays, no mapfile.
@@ -303,8 +311,11 @@ repos_file() { # [group] -> paths from the repos file; no group = every path
   done < "$CONFIG_DIR/repos"
 }
 
+NOCONFIG=0   # set when no list is saved and repositories were detected instead
+SCOPE=""
+
 discover() { # each argument is a path, or the name of a [group] in the repos file
-  local a
+  local a top g
   if [ "$#" -gt 0 ]; then
     for a in "$@"; do
       if [ ! -d "$a" ] && [ -n "$(repos_file "$a")" ]; then repos_file "$a"; else printf '%s\n' "$a"; fi
@@ -312,9 +323,45 @@ discover() { # each argument is a path, or the name of a [group] in the repos fi
     return
   fi
   if [ -n "$(repos_file)" ]; then repos_file; return; fi
-  local top; top=$(git rev-parse --show-toplevel 2>/dev/null)
-  if [ -n "$top" ]; then printf '%s\n' "$top"; return; fi
-  find . -mindepth 2 -maxdepth 3 -name .git -prune 2>/dev/null | sed 's|/\.git$||; s|^\./||' | sort
+
+  # nothing saved: detect, and be conservative with the modes that change something
+  NOCONFIG=1
+  top=$(git rev-parse --show-toplevel 2>/dev/null)
+  if [ -n "$top" ]; then
+    { scan_repos "$(dirname "$top")"; printf '%s\n' "$top"; } | sort -u | detect_groups > "$TMP.groups"
+    case $MODE in
+      remote|full|local|cleanup)
+        SCOPE="only the current repository; modes that change something wait until a list is saved"
+        printf '%s\n' "$top" ;;
+      *)
+        g=$(awk -F "$SEP" -v t="$top" '$1 == "G" && $4 == t { print $2; exit }' "$TMP.groups")
+        SCOPE="the detected group [$g]"
+        awk -F "$SEP" -v g="$g" '$1 == "G" && $2 == g { print $4 }' "$TMP.groups" ;;
+    esac
+  else
+    scan_repos "$(pwd -P)" | detect_groups > "$TMP.groups"
+    case $MODE in
+      remote|full|local|cleanup) SCOPE="nothing; modes that change something need a saved list or a repository as the current folder" ;;
+      *) SCOPE="every detected repository"; awk -F "$SEP" '$1 == "G" { print $4 }' "$TMP.groups" ;;
+    esac
+  fi
+}
+
+setup_block() { # printed after a report when no list is saved and more than one repository was detected
+  [ "$NOCONFIG" = 1 ] && [ -f "$TMP.groups" ] || return 0
+  [ "$(grep -c "^G$SEP" "$TMP.groups")" -ge 2 ] || return 0
+  echo
+  echo "Setup (no saved repository list yet; this run covered $SCOPE)"
+  proposal "$TMP.groups"
+}
+
+unlisted_note() { # a list is saved, but the repository we are standing in is not part of it
+  local top
+  [ "$NOCONFIG" = 0 ] && [ "${#ARGS[@]}" -eq 0 ] || return 0
+  top=$(git rev-parse --show-toplevel 2>/dev/null); [ -n "$top" ] || return 0
+  repos_file | grep -qxF -- "$top" && return 0
+  echo
+  echo "Note: the current repository is not in your saved list, so it was not checked. To add it (after the user agrees): bash $(qpath "$SELF") add $(qpath "$top")"
 }
 
 # --- report -------------------------------------------------------------------
@@ -745,7 +792,179 @@ run_hook() {
   return 0
 }
 
+# --- detection: find repositories and propose groups when no list is saved ---------
+# Records: G <group> <owner|-> <path> | Q <text the agent should ask the user about>
+
+repo_origin_path() { # repo -> "owner/name" from the origin URL (empty when there is no origin)
+  local u name rest
+  u=$(git -C "$1" remote get-url origin 2>/dev/null) || return 0
+  u=${u%/}; u=${u%.git}; u=${u##*:}
+  name=${u##*/}; rest=${u%/*}
+  printf '%s/%s' "${rest##*/}" "$name"
+}
+
+scan_repos() { # dir -> absolute paths of the repositories up to two levels below it
+  (cd "$1" 2>/dev/null && find . -mindepth 2 -maxdepth 3 -name .git -not -path '*/.*/*' -not -path '*/node_modules/*' -prune 2>/dev/null) \
+    | sed 's|/\.git$||; s|^\./||' | sort | while IFS= read -r r; do printf '%s/%s\n' "${1%/}" "$r"; done
+}
+
+detect_groups() { # repository paths on stdin -> G and Q records; repositories with the same remote owner form a group
+  local r op
+  while IFS= read -r r; do
+    [ -n "$r" ] || continue
+    op=$(repo_origin_path "$r")
+    printf '%s%s%s%s%s%s%s\n' "${op%/*}" "$SEP" "${op##*/}" "$SEP" "$(basename "$r")" "$SEP" "$r"
+  done | awk -F "$SEP" -v S="$SEP" '
+    { owner[NR] = $1; rname[NR] = $2; base[NR] = $3; path[NR] = $4; n = NR
+      key = ($1 == "" ? "?" NR : "o:" $1)
+      if (!(key in cnt)) order[++k] = key
+      cnt[key]++; members[key] = members[key] " " NR }
+    END {
+      for (i = 1; i <= k; i++) {
+        key = order[i]; m = split(substr(members[key], 2), ids, " ")
+        if (m >= 2) {            # group name: common prefix of the folder names, else the owner
+          p = base[ids[1]]
+          for (j = 2; j <= m; j++) { b = base[ids[j]]; while (p != "" && substr(b, 1, length(p)) != p) p = substr(p, 1, length(p) - 1) }
+          sub(/[^A-Za-z0-9]+$/, "", p); name = (length(p) >= 3 ? p : substr(key, 3))
+        } else name = (rname[ids[1]] != "" ? rname[ids[1]] : base[ids[1]])
+        gsub(/[^A-Za-z0-9._-]/, "-", name)
+        if (name in used) { used[name]++; name = name "-" used[name] } else used[name] = 1
+        gname[key] = name
+        for (j = 1; j <= m; j++) {
+          id = ids[j]; print "G" S name S (owner[id] == "" ? "-" : owner[id]) S path[id]
+          if (owner[id] == "") print "Q" S path[id] ": no remote, so its project could not be inferred"
+        }
+      }
+      for (i = 1; i <= k; i++) {
+        key = order[i]; if (cnt[key] < 2) continue
+        g = gname[key]; glen = length(g)
+        for (id = 1; id <= n; id++)
+          if ("o:" owner[id] != key && substr(base[id], 1, glen) == g && substr(base[id], glen + 1, 1) ~ /[-_.]/)
+            print "Q" S path[id] ": named like group [" g "] but its remote owner is different (" (owner[id] == "" ? "none" : owner[id]) ")"
+      }
+      if (n > 10) print "Q" S n " repositories found: confirm the list with the user before saving"
+    }'
+}
+
+proposal() { # file of G/Q records -> proposed groups, open questions, and the commands that save them
+  local f=$1 g n owner paths self; self=$(qpath "$SELF")
+  # shellcheck disable=SC2013  # group names are sanitized by detect_groups: no spaces or globs
+  for g in $(grep "^G$SEP" "$f" | cut -d "$SEP" -f2 | awk '!seen[$0]++'); do
+    n=$(awk -F "$SEP" -v g="$g" '$1 == "G" && $2 == g' "$f" | grep -c .)
+    owner=$(awk -F "$SEP" -v g="$g" '$1 == "G" && $2 == g { print $3; exit }' "$f")
+    paths=$(awk -F "$SEP" -v g="$g" '$1 == "G" && $2 == g { print $4 }' "$f" | while IFS= read -r r; do printf '%s ' "$(qpath "$r")"; done)
+    echo "- [$g] $n repo(s), remote owner $owner: ${paths% }"
+  done
+  if grep -q "^Q$SEP" "$f"; then
+    echo "Ask the user about:"
+    grep "^Q$SEP" "$f" | cut -d "$SEP" -f2 | while IFS= read -r r; do echo "- ${r/#$HOME/~}"; done
+  fi
+  echo "To save these groups (only after the user agrees):"
+  # shellcheck disable=SC2013  # group names are sanitized by detect_groups: no spaces or globs
+  for g in $(grep "^G$SEP" "$f" | cut -d "$SEP" -f2 | awk '!seen[$0]++'); do
+    paths=$(awk -F "$SEP" -v g="$g" '$1 == "G" && $2 == g { print $4 }' "$f" | while IFS= read -r r; do printf '%s ' "$(qpath "$r")"; done)
+    echo "  bash $self add --group $g ${paths% }"
+  done
+}
+
+run_detect() {
+  local top where tmp; tmp=$(mktemp "${TMPDIR:-/tmp}/git-parity.XXXXXX") || die "mktemp failed"
+  top=$(git rev-parse --show-toplevel 2>/dev/null)
+  if [ -n "$top" ]; then where=$(dirname "$top"); else where=$(pwd -P); fi
+  { scan_repos "$where"; [ -n "$top" ] && printf '%s\n' "$top"; } | sort -u | detect_groups > "$tmp"
+  local saved; saved=$(repos_file | grep -c .)
+  echo "git-parity detect · $(grep -c "^G$SEP" "$tmp") repo(s) found under $(qpath "$where") · $saved saved"
+  echo
+  if grep -q "^G$SEP" "$tmp"; then proposal "$tmp"; else echo "No repositories found here. Pass paths to: bash $(qpath "$SELF") add <path ...>"; fi
+  rm -f "$tmp"
+}
+
+# --- add: maintain the saved repository list (the only file this script ever writes) ---
+repos_entries() { # -> "<group><SEP><absolute path>" for every saved repository
+  local section="" line
+  [ -f "$CONFIG_DIR/repos" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%%#*}"
+    line=$(printf '%s' "$line" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+    [ -n "$line" ] || continue
+    case $line in "["*"]") section=${line#[}; section=${section%]}; continue ;; esac
+    case $line in "~"*) line="$HOME${line#\~}" ;; esac
+    printf '%s%s%s\n' "$section" "$SEP" "$line"
+  done < "$CONFIG_DIR/repos"
+}
+
+list_saved() {
+  local n; n=$(repos_entries | grep -c .)
+  if [ "$n" -eq 0 ]; then echo "Saved list: empty."; return; fi
+  echo "Saved list ($n repo(s)):"
+  repos_entries | awk -F "$SEP" -v home="$HOME" '
+    { g = ($1 == "" ? "ungrouped" : "[" $1 "]"); p = $2; if (index(p, home "/") == 1) p = "~" substr(p, length(home) + 1)
+      if (!(g in seen)) { seen[g] = 1; order[++k] = g }
+      list[g] = list[g] (list[g] == "" ? "" : ", ") p }
+    END { for (i = 1; i <= k; i++) print "- " order[i] " " list[order[i]] }'
+}
+
+run_add() {
+  local group="" action=add a abs cur changed=0
+  local paths=()
+  while [ "$#" -gt 0 ]; do
+    case $1 in
+      --group) group=${2:-}; [ "$#" -gt 1 ] && shift ;;
+      --remove) action=remove ;;
+      --list) action=list ;;
+      *) paths+=("$1") ;;
+    esac
+    shift
+  done
+  case $group in *[!A-Za-z0-9._-]*) die "a group name may only use letters, digits, dot, dash and underscore" ;; esac
+  if [ "$action" = list ]; then list_saved; return; fi
+  if [ "${#paths[@]}" -eq 0 ]; then
+    echo "git-parity add: give at least one repository path, for example: add --group work ~/code/api ~/code/web"
+    list_saved; return
+  fi
+  mkdir -p "$CONFIG_DIR" || die "cannot create $CONFIG_DIR"
+  cur=$(mktemp "${TMPDIR:-/tmp}/git-parity.XXXXXX") || die "mktemp failed"
+  repos_entries > "$cur"
+  for a in "${paths[@]}"; do
+    if [ "$action" = remove ]; then
+      abs=$a; [ -d "$a" ] && abs=$(cd "$a" && pwd -P)
+      if awk -F "$SEP" -v p="$abs" '$2 == p { f = 1 } END { exit !f }' "$cur"; then
+        awk -F "$SEP" -v p="$abs" '$2 != p' "$cur" > "$cur.new" && mv "$cur.new" "$cur"
+        echo "removed: $(qpath "$abs")"; changed=1
+      else
+        echo "not in the list: $(qpath "$abs")"
+      fi
+    else
+      abs=$(git -C "$a" rev-parse --show-toplevel 2>/dev/null) || { echo "skipped, not a git repository: $a"; continue; }
+      if awk -F "$SEP" -v p="$abs" '$2 == p { f = 1 } END { exit !f }' "$cur"; then
+        echo "already listed: $(qpath "$abs")"
+      else
+        printf '%s%s%s\n' "$group" "$SEP" "$abs" >> "$cur"
+        if [ -n "$group" ]; then echo "added to [$group]: $(qpath "$abs")"; else echo "added to ungrouped: $(qpath "$abs")"; fi
+        changed=1
+      fi
+    fi
+  done
+  if [ "$changed" = 1 ]; then
+    {
+      echo "# git-parity repositories. One path per line; [name] starts a group."
+      echo "# Managed by: git-parity add / add --remove (a copy of the previous version is kept in repos.bak)."
+      awk -F "$SEP" -v home="$HOME" '
+        function short(p) { return (index(p, home "/") == 1 ? "~" substr(p, length(home) + 1) : p) }
+        $1 == "" { print short($2); next }
+        { if (!($1 in seen)) { seen[$1] = 1; order[++k] = $1 }; list[$1] = list[$1] short($2) "\n" }
+        END { for (i = 1; i <= k; i++) printf "\n[%s]\n%s", order[i], list[order[i]] }' "$cur"
+    } > "$CONFIG_DIR/repos.tmp" || die "cannot write $CONFIG_DIR/repos.tmp"
+    [ -f "$CONFIG_DIR/repos" ] && cp "$CONFIG_DIR/repos" "$CONFIG_DIR/repos.bak"
+    mv "$CONFIG_DIR/repos.tmp" "$CONFIG_DIR/repos" || die "cannot write $CONFIG_DIR/repos"
+  fi
+  rm -f "$cur" "$cur.new"
+  echo
+  list_saved
+}
+
 # --- main ---------------------------------------------------------------------
+SELF=$(cd "$(dirname "$0")" && pwd -P)/$(basename "$0")
 if [ "${1:-}" = "--worker" ]; then shift; worker "$@"; exit 0; fi
 if [ "${1:-}" = "--feature-worker" ]; then shift; feature_worker "$@"; exit 0; fi
 if [ "${1:-}" = "--cleanup-worker" ]; then shift; cleanup_worker "$@"; exit 0; fi
@@ -755,8 +974,8 @@ if [ "${1:-}" = "--print-prs-jq" ]; then printf '%s\n' "$PRS_JQ"; exit 0; fi
 if [ "${1:-}" = "hook" ]; then run_hook; exit 0; fi
 
 MODE=${1:-status}; [ "$#" -gt 0 ] && shift
-case $MODE in status|remote|local|full|feature|cleanup|prs|whats-new) ;; -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-  *) die "unknown mode '$MODE' (use: status, remote, local, full, feature, cleanup, prs, whats-new)" ;; esac
+case $MODE in status|remote|local|full|feature|cleanup|prs|whats-new|detect|add) ;; -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  *) die "unknown mode '$MODE' (use: status, remote, local, full, feature, cleanup, prs, whats-new, detect, add)" ;; esac
 
 # Some agents pass everything the user typed as one quoted argument ("web --no-fetch"),
 # or an empty string when nothing was typed. Split those, unless it is a real path with spaces.
@@ -769,9 +988,19 @@ for a in "$@"; do
     *) set -- "$a" ;;
   esac
   for w in "$@"; do
-    case $w in --no-fetch) DO_FETCH=0 ;; -*) die "unknown option '$w'" ;; *) ARGS+=("$w") ;; esac
+    # shellcheck disable=SC2088  # a literal tilde is meant: agents pass it unexpanded inside one string
+    case $w in "~"|"~/"*) w="$HOME${w#\~}" ;; esac
+    case $w in
+      --no-fetch) DO_FETCH=0 ;;
+      --group|--remove|--list) if [ "$MODE" = add ]; then ARGS+=("$w"); else die "unknown option '$w'"; fi ;;
+      -*) die "unknown option '$w'" ;;
+      *) ARGS+=("$w") ;;
+    esac
   done
 done
+
+if [ "$MODE" = add ]; then run_add ${ARGS[@]+"${ARGS[@]}"}; exit 0; fi
+if [ "$MODE" = detect ]; then run_detect; exit 0; fi
 
 PATTERN=""
 if [ "$MODE" = feature ]; then
@@ -785,13 +1014,19 @@ if [ "$MODE" = feature ]; then
 fi
 
 TMP=$(mktemp "${TMPDIR:-/tmp}/git-parity.XXXXXX") || die "mktemp failed"
-trap 'rm -f "$TMP" "$TMP.repos"' EXIT
+trap 'rm -f "$TMP" "$TMP.repos" "$TMP.groups"' EXIT
 
 discover ${ARGS[@]+"${ARGS[@]}"} > "$TMP.repos"
 TOTAL=$(grep -c . "$TMP.repos")
 if [ "$TOTAL" -eq 0 ]; then
-  echo "git-parity: no repositories found."
-  echo "Pass paths as arguments, run inside a repository, or list one path per line in $CONFIG_DIR/repos"
+  if [ "$NOCONFIG" = 1 ] && grep -q "^G$SEP" "$TMP.groups" 2>/dev/null; then
+    echo "git-parity $MODE: no repository selected. Run it inside a repository, or save the list below first."
+    SCOPE="nothing"; setup_block
+    [ "$(grep -c "^G$SEP" "$TMP.groups")" -ge 2 ] || { echo; proposal "$TMP.groups"; }
+  else
+    echo "git-parity: no repositories found."
+    echo "Run it inside a repository or a folder that contains repositories, or add some: bash $(qpath "$SELF") add <path ...>"
+  fi
   exit 0
 fi
 
@@ -814,3 +1049,5 @@ case $MODE in
     END=$(date +%s)
     render "$MODE" "$TMP" "$TOTAL" "$((END - START))" ;;
 esac
+setup_block
+unlisted_note

@@ -1,6 +1,6 @@
 description = "Fast-forward local branches from their remotes, then report."
 prompt = """
-The report below was produced after fast-forwarding every branch that was strictly behind its remote. Show it as is and say how many repositories were updated and how many need the user. Present it in the user's language; keep repository names, branch names, states and commands verbatim. Never pull over uncommitted changes, stash, reset, rebase, switch branches, delete or push anything. A skipped repository is a correct outcome.
+The report below was produced after fast-forwarding every branch that was strictly behind its remote. Show it as is and say how many repositories were updated and how many need the user. Present it in the user's language; keep repository names, branch names, states and commands verbatim. Never pull over uncommitted changes, stash, reset, rebase, switch branches, delete or push anything. A skipped repository is a correct outcome. If the output ends with a "Setup" section or a "Note:" about the current repository, tell the user which groups were detected, ask about anything under "Ask the user about", and ask once whether to save; on a yes run the printed add command(s) exactly.
 
 !{bash ~/.gemini/extensions/git-parity/scripts/git-parity.sh remote {{args}}}
 """

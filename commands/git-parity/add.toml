@@ -1,0 +1,6 @@
+description = "Save, list or remove the repositories git-parity tracks, optionally in groups."
+prompt = """
+The result below shows what was added, skipped or already listed; the saved list is the only file changed. Show the "Saved list" and say in one sentence what changed. If no path was given, run `bash ~/.gemini/extensions/git-parity/scripts/git-parity.sh detect`, show the proposed groups and ask the user which to save before running add. Never add a repository without the user agreeing.
+
+!{bash ~/.gemini/extensions/git-parity/scripts/git-parity.sh add {{args}}}
+"""
