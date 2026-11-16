@@ -47,6 +47,8 @@ agy plugin install https://github.com/Dev-Wesley-13/git-parity
 ```
 
 Antigravity exposes the commands as skills: ask in plain words ("run git-parity status").
+`agy plugin validate` reports one warning, about the `commands/` folder: those files are the
+Gemini CLI commands, which Antigravity does not load. The nine skills are what it uses.
 For a single project you can also copy `plugin.json`, `skills/` and `scripts/` into
 `<project>/.agents/plugins/git-parity/`; the desktop app loads it from there.
 
@@ -80,7 +82,7 @@ clone runs as is; versions before 1.3.2 could be checked out with CRLF, which ba
 |---|---|---|
 | Claude Code | CLI and desktop app: `status`, `remote`, `local`, `full`, `feature`, `cleanup` and `whats-new`, including declined pushes and deletions; `status`, `whats-new`, detection and the save question on Haiku | Accepting a push or a pull request end to end; `prs` and `add` as skills (script level only) |
 | Codex | CLI in WSL and desktop app on Windows: install from GitHub and `status`, including on GPT Terra | The other commands; install through the app's own Plugins page |
-| Antigravity | Desktop app on Windows: `status`, with the plugin loaded from the project folder, including on Gemini 3.8 Flash | `agy plugin install`; install through the app; the other commands |
+| Antigravity | Desktop app on Windows: `status`, with the plugin loaded from the project folder, including on Gemini 3.8 Flash. CLI: `agy plugin validate` passes and `agy plugin install` from GitHub installs the nine skills | A conversation in the CLI; install through the app; the other commands |
 | Gemini CLI | `extensions validate`, install from GitHub, every skill and command loads | Any conversation |
 
 GitLab support was tested against a simulated `glab` only. If something behaves differently
