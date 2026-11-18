@@ -1,7 +1,7 @@
 # git-parity
 
 [![CI](https://github.com/Dev-Wesley-13/git-parity/actions/workflows/ci.yml/badge.svg)](https://github.com/Dev-Wesley-13/git-parity/actions/workflows/ci.yml)
-[![License: free to use, no modification](https://img.shields.io/badge/license-free%20to%20use%2C%20no%20modification-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 **Keep local and remote git branches in parity across all your repositories, from one command in Claude Code, Codex or Antigravity (Gemini).**
 
@@ -144,7 +144,7 @@ What was verified on which agent, honestly stated: [docs/agents.md](docs/agents.
 - [How it works](docs/how-it-works.md): the design and every decision the script makes.
 - [Safety](docs/safety.md): what it never does, and how that is tested.
 - [Troubleshooting](docs/troubleshooting.md).
-- [Changelog](CHANGELOG.md) · [Feedback](CONTRIBUTING.md) · [Security](SECURITY.md) · [Trademarks](TRADEMARKS.md)
+- [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Trademarks](TRADEMARKS.md)
 
 ## FAQ
 
@@ -164,24 +164,16 @@ Yes: `bash scripts/git-parity.sh status`. It depends only on bash and git.
 
 ## License
 
-git-parity is **free to use for everyone**, at home or at work, in any repository or project,
-including commercial ones.
+git-parity is open source under the **Apache License 2.0** ([LICENSE](LICENSE) and
+[NOTICE](NOTICE)). It is free for any use, personal or commercial.
 
-It is **not open source**. You may not modify it, publish changed versions, or redistribute
-it (including selling it or listing it somewhere else) without written permission from the
-author. To ask, open an issue.
+If you redistribute it, with or without changes, keep the copyright notices and the
+[NOTICE](NOTICE) file, and state the changes you made in any file you modified.
 
-The terms are the [PolyForm Strict License 1.0.0](LICENSE) plus an additional permission that
-allows any use, including commercial use. Two things that stay possible, by design: GitHub's
-own terms let anyone view and fork this public repository on GitHub, and installing the plugin
-with an agent makes a local copy, which the license allows. What the license withholds is the
-right to change git-parity and to pass copies on.
+The name "git-parity" and its logo are not covered by the code license (Apache License 2.0,
+Section 6); see [TRADEMARKS.md](TRADEMARKS.md). git-parity is not affiliated with the Git project.
 
-Builds published before 1.5.0 (13 to 16 November 2026) were withdrawn. Those of them released
-under the MIT License stay under MIT for anyone who already has them. This summary is not legal
-advice; the [LICENSE](LICENSE) file is what applies.
+Contributions are accepted under the Contributor License Agreement in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-The git-parity name and logo are covered by [TRADEMARKS.md](TRADEMARKS.md). git-parity is not
-affiliated with the Git project.
-
-Copyright (c) 2026 Wesley Rafael Fonseca.
+Copyright 2026 Wesley Rafael Fonseca.

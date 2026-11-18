@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright 2026 Wesley Rafael Fonseca
+# SPDX-License-Identifier: Apache-2.0
 # git-parity: report (and safely fast-forward) the state of many git repositories.
 #
 # Usage: git-parity.sh <status|remote|local|full|cleanup|prs|whats-new> [--no-fetch] [repo-path|group ...]

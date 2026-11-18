@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.5.1] - 2026-11-18
+
+### Changed
+
+- **License: Apache License 2.0** from this version on, with a `NOTICE` file that redistributions
+  must keep, and an SPDX header in `scripts/git-parity.sh`. Version 1.5.0 remains under the terms it
+  shipped with (PolyForm Strict 1.0.0 with an additional permission).
+- `TRADEMARKS.md` now refers to Section 6 of the Apache License 2.0: the name and logo may not be
+  used to promote forks or derived products without permission.
+- Pull requests are accepted again, under the Contributor License Agreement in `CONTRIBUTING.md`.
+
+### Added
+
+- Pull request template and issue forms (bug report, feature request).
+
 ## [1.5.0] - 2026-11-18
 
 First official release.

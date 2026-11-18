@@ -1,12 +1,12 @@
 {
   "name": "git-parity",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Keep local and remote git branches in parity across many repositories: safe fast-forward sync, push and PR offers, and a short report with next steps.",
   "author": {
     "name": "Wesley Rafael Fonseca",
     "url": "https://github.com/Dev-Wesley-13"
   },
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "Apache-2.0",
   "keywords": [
     "git",
     "sync",

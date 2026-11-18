@@ -1,0 +1,40 @@
+name: Bug report
+description: Something git-parity did, or did not do, that looks wrong.
+labels: [bug]
+body:
+  - type: textarea
+    id: report
+    attributes:
+      label: git-parity output
+      description: Paste the report git-parity printed. Remove anything private (paths, repository or branch names) if needed.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: What should have happened instead?
+    validations:
+      required: true
+  - type: input
+    id: agent
+    attributes:
+      label: Agent and version
+      placeholder: "Claude Code 2.1.286, Codex 0.169, Antigravity 1.5.9, Gemini CLI 0.68"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Ubuntu 24.04 on WSL, macOS 15, Windows 11 with Git Bash"
+    validations:
+      required: true
+  - type: input
+    id: git
+    attributes:
+      label: git --version
+      placeholder: "git version 2.43.0"
+    validations:
+      required: true

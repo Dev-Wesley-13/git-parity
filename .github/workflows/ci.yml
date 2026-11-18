@@ -24,9 +24,9 @@ jobs:
           versions = {data[f]["version"] for f in (".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "gemini-extension.json", "plugin.json")}
           assert len(versions) == 1, f"version mismatch across manifests: {versions}"
           licenses = {data[f]["license"] for f in (".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "plugin.json")}
-          assert licenses == {"SEE LICENSE IN LICENSE"}, f"license mismatch across manifests: {licenses}"
-          assert open("LICENSE").read().startswith("# PolyForm Strict License 1.0.0"), "LICENSE is not the PolyForm Strict text"
-          assert "## Additional Permission" in open("LICENSE").read(), "LICENSE lost the additional permission"
+          assert licenses == {"Apache-2.0"}, f"license mismatch across manifests: {licenses}"
+          assert "Apache License" in open("LICENSE").read() and "Version 2.0" in open("LICENSE").read(), "LICENSE is not Apache 2.0"
+          assert "Wesley Rafael Fonseca" in open("NOTICE").read(), "NOTICE file is missing author attribution"
           skills = sorted(p.split("/")[1] for p in glob.glob("skills/*/SKILL.md"))
           commands = sorted(p.split("/")[-1][:-5] for p in glob.glob("commands/git-parity/*.toml"))
           assert skills == commands, f"skills and Gemini commands differ: {skills} vs {commands}"
