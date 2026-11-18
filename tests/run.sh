@@ -227,7 +227,7 @@ out=$(bash "$GP" bogus 2>&1); eq "bad mode exit" "$?" "2"
 out=$(cd "$T/scan/a" && bash "$GP" status)
 has "no repos" "$out" "no repositories found"
 
-# --- 1.1.0: groups, feature, cleanup, forks ----------------------------------
+# --- groups, feature, cleanup, forks ----------------------------------
 
 # 19. groups in the repos file
 GA=$(new g-a); GB=$(new g-b); GC=$(new g-c)
@@ -309,7 +309,7 @@ has "fork/remote" "$out" "main updated +2 from upstream"
 eq  "fork/remote sha" "$(sha "$K" main)" "$(sha "$K" upstream/main)"
 has "fork/next" "$out" "push origin main"
 
-# --- 1.2.0: prs, whats-new, GitLab, session hook ------------------------------
+# --- prs, whats-new, GitLab, session hook ------------------------------
 
 US=$(printf '\037')
 
@@ -411,7 +411,7 @@ out=$(bash "$GP" feature "zed $Q1 --no-fetch"); has "args/feature pattern from o
 out=$(bash "$GP" feature "");                   has "args/feature empty string" "$out" "a branch name or pattern is needed"
 out=$(bash "$GP" status --no-fetch "$T/with space/sp"); has "args/real path with spaces kept" "$out" "| sp | main |"
 
-# --- 1.4.0: detection, groups by remote owner, add ----------------------------
+# --- detection, groups by remote owner, add ----------------------------
 
 # newo <owner> <name> <parent dir>: clone whose origin URL ends in <owner>/<name>.git
 newo() {

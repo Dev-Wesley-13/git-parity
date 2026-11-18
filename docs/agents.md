@@ -74,7 +74,7 @@ wsl.exe -d <distro> -- bash -c 'bash "$(wslpath -u <path-with-forward-slashes>/s
 
 Desktop agents run in a sandbox and ask your permission the first time they call `wsl.exe`.
 That is expected. The repository forces LF line endings (`.gitattributes`), so a Windows
-clone runs as is; versions before 1.3.2 could be checked out with CRLF, which bash rejects.
+clone runs as is (bash rejects CRLF line endings).
 
 ## What was verified
 

@@ -42,8 +42,8 @@ The host CLI is missing or not logged in: `gh auth status` (GitHub) or `glab aut
 
 ## Windows: bash reports `$'\r': command not found`
 
-The script was checked out with CRLF line endings. Update to 1.3.2 or later and reinstall
-the plugin; the repository now forces LF.
+The script was checked out with CRLF line endings. Reinstall the plugin from the current
+version; the repository turns line-ending conversion off, so every checkout gets LF.
 
 ## Windows: the agent's command fails with exit code 1 before running the script
 

@@ -1,7 +1,7 @@
 {
   "name": "git-parity",
   "displayName": "git-parity",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Keep local and remote git branches in parity across many repositories: safe fast-forward sync, push and PR offers, and a short report with next steps.",
   "author": {
     "name": "Wesley Rafael Fonseca",
@@ -9,7 +9,7 @@
   },
   "homepage": "https://github.com/Dev-Wesley-13/git-parity",
   "repository": "https://github.com/Dev-Wesley-13/git-parity",
-  "license": "PolyForm-Shield-1.0.0",
+  "license": "SEE LICENSE IN LICENSE",
   "keywords": [
     "git",
     "sync",

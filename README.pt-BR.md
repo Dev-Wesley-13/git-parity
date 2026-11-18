@@ -72,15 +72,24 @@ de um grupo: `/git-parity:remote loja`.
 
 ## Licença
 
-O git-parity é **gratuito e de código disponível**, sob a
-[PolyForm Shield License 1.0.0](LICENSE).
+O git-parity é **gratuito para todos**, em casa ou no trabalho, em qualquer repositório ou
+projeto, inclusive comercial.
 
-Em palavras simples: você pode usar para qualquer fim, em casa ou no trabalho, ler, copiar,
-alterar e compartilhar, desde que a licença e o aviso de copyright acompanhem. Não pode
-oferecer o git-parity, ou algo feito a partir dele, como produto que concorra com o
-git-parity, pago ou gratuito. Vender ou relistar como seu se enquadra nisso.
+**Não é open source.** Não é permitido modificar, publicar versões alteradas nem redistribuir
+(o que inclui vender ou listar em outro lugar) sem autorização escrita do autor. Para pedir,
+abra uma issue.
 
-As versões 1.0.0 a 1.3.3 saíram sob a licença MIT e continuam disponíveis sob ela. Este
-resumo não é aconselhamento jurídico; vale o arquivo [LICENSE](LICENSE).
+Os termos são a [PolyForm Strict License 1.0.0](LICENSE) com uma permissão adicional que libera
+qualquer uso, inclusive comercial. Continua possível, por definição: os termos do GitHub deixam
+qualquer pessoa ver e fazer fork deste repositório público dentro do GitHub, e instalar o plugin
+por um agente faz uma cópia local, que a licença permite. O que a licença retira é o direito de
+alterar o git-parity e de repassar cópias.
+
+As builds publicadas antes da 1.5.0 (13 a 16 de novembro de 2026) foram retiradas; as que saíram
+sob a licença MIT continuam MIT para quem já as tem. Este resumo não é aconselhamento jurídico;
+vale o arquivo [LICENSE](LICENSE).
+
+O nome e o logo git-parity seguem o [TRADEMARKS.md](TRADEMARKS.md). O git-parity não tem
+relação com o projeto Git.
 
 Copyright (c) 2026 Wesley Rafael Fonseca.

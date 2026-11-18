@@ -11,7 +11,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Test suite
         run: bash tests/run.sh
       - name: Manifests are valid and consistent
@@ -24,8 +24,9 @@ jobs:
           versions = {data[f]["version"] for f in (".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "gemini-extension.json", "plugin.json")}
           assert len(versions) == 1, f"version mismatch across manifests: {versions}"
           licenses = {data[f]["license"] for f in (".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "plugin.json")}
-          assert licenses == {"PolyForm-Shield-1.0.0"}, f"license mismatch across manifests: {licenses}"
-          assert open("LICENSE").read().startswith("# PolyForm Shield License 1.0.0"), "LICENSE is not the PolyForm Shield text"
+          assert licenses == {"SEE LICENSE IN LICENSE"}, f"license mismatch across manifests: {licenses}"
+          assert open("LICENSE").read().startswith("# PolyForm Strict License 1.0.0"), "LICENSE is not the PolyForm Strict text"
+          assert "## Additional Permission" in open("LICENSE").read(), "LICENSE lost the additional permission"
           skills = sorted(p.split("/")[1] for p in glob.glob("skills/*/SKILL.md"))
           commands = sorted(p.split("/")[-1][:-5] for p in glob.glob("commands/git-parity/*.toml"))
           assert skills == commands, f"skills and Gemini commands differ: {skills} vs {commands}"
@@ -41,5 +42,5 @@ jobs:
   shellcheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: shellcheck scripts/git-parity.sh tests/run.sh

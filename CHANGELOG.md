@@ -4,6 +4,36 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-11-18
+
+First official release.
+
+### What git-parity does
+
+- Checks every repository of a project in parallel and prints one report, ordered by what needs
+  you, with the exact next step for each repository.
+- `status`, `remote` (fast-forward only), `local` (push and pull request on confirmation),
+  `full`, `feature`, `cleanup`, `prs`, `whats-new` and `add`.
+- Finds the repositories of a project on its own and groups them by remote owner; the agent asks
+  before saving.
+- Works in Claude Code, Codex, Antigravity and Gemini CLI, on Linux, macOS and Windows (Git Bash
+  or WSL). GitHub and GitLab for pull and merge requests.
+
+### Changed
+
+- **License:** PolyForm Strict License 1.0.0 with an additional permission for any use,
+  including commercial. Free for everyone; modifying or redistributing requires the author's
+  permission.
+- Pull requests are no longer accepted; feedback goes through issues (`CONTRIBUTING.md`).
+- Added `TRADEMARKS.md`.
+- Removed version numbers from documentation and examples.
+
+### Earlier builds
+
+Builds 1.0.0 to 1.4.1 were published between 13 and 16 November 2026 while the plugin was being
+developed. Their releases were removed when 1.5.0 came out. The details below are kept for
+reference.
+
 ## [1.4.1] - 2026-11-16
 
 ### Added
